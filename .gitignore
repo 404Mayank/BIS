@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+.env
+.env.*
+.venv*/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# Caches and tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# Editors/OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Node (in case of mixed projects)
+node_modules/
+
+# Ultralytics/YOLO temp
+# (Keep runs committed if desired; large binaries handled via Git LFS)
