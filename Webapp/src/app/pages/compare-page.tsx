@@ -64,8 +64,8 @@ export function ComparePage() {
         </div>
       </header>
 
-      {/* Hidden video for capture */}
-      <video ref={camera.videoRef} autoPlay playsInline muted className="hidden" />
+      {/* Hidden video for capture (opacity-0 prevents mobile browsers from pausing decode) */}
+      <video ref={camera.videoRef} autoPlay playsInline muted className="fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none" />
 
       {/* Compare fills everything */}
       <div className="flex-1 min-h-0 flex flex-col">
