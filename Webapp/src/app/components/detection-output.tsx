@@ -38,11 +38,11 @@ export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, on
           Live Feed
         </span>
         <div className="flex items-center gap-2">
-          {isCameraOn && !isRunning && onCapture && (
+          {onCapture && (
             <button
               onClick={handleCapture}
-              disabled={isCapturing}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] bg-cyan-900/40 hover:bg-cyan-800/50 border border-cyan-700/40 text-cyan-300 tracking-wider uppercase transition-colors disabled:opacity-50"
+              disabled={isCapturing || isRunning || !isCameraOn}
+              className="flex items-center gap-1 px-2 py-1 text-[10px] bg-cyan-900/40 hover:bg-cyan-800/50 border border-cyan-700/40 text-cyan-300 tracking-wider uppercase transition-colors disabled:opacity-30"
             >
               {isCapturing ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -52,14 +52,18 @@ export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, on
               Capture
             </button>
           )}
-          {isCameraOn && (
-            <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-red-500 animate-pulse' : 'bg-emerald-400'}`} />
-              <span className={`text-[10px] tracking-wider uppercase ${isRunning ? 'text-red-400' : 'text-emerald-400'}`}>
-                {isRunning ? 'DETECTING' : 'LIVE'}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              !isCameraOn ? 'bg-neutral-600' :
+              isRunning ? 'bg-red-500 animate-pulse' : 'bg-emerald-400'
+            }`} />
+            <span className={`text-[10px] tracking-wider uppercase ${
+              !isCameraOn ? 'text-neutral-500' :
+              isRunning ? 'text-red-400' : 'text-emerald-400'
+            }`}>
+              {!isCameraOn ? 'OFFLINE' : isRunning ? 'DETECTING' : 'LIVE'}
+            </span>
+          </div>
         </div>
       </div>
 

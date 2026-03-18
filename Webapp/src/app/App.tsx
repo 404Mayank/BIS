@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
+import { LogOut, Shield } from 'lucide-react';
 import { YoloControls } from './components/yolo-controls';
 import { DetectionOutput } from './components/detection-output';
 import { MetricsPanel } from './components/metrics-panel';
@@ -8,6 +9,7 @@ import { LoadingOverlay } from './components/loading-overlay';
 import { useCamera } from './hooks/use-camera';
 import { useInference } from './hooks/use-inference';
 import { UltralyticsInferenceService } from './services/ultralytics-inference';
+import { getUser, isAdmin, logout, authFetch } from './services/auth-service';
 import type { ModelInfo, CaptureResult } from './services/inference-service';
 
 export default function App() {
@@ -45,9 +47,17 @@ export default function App() {
     });
   }, []);
 
+  const user = getUser();
+  const userIsAdmin = isAdmin();
+
+  const handleLogout = useCallback(() => {
+    logout();
+    navigate('/login');
+  }, [navigate]);
+
   const fetchModels = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/models');
+      const response = await authFetch('/api/models');
       const data = await response.json();
       setModels(data);
       if (data.length > 0 && !selectedModel) {
@@ -104,7 +114,27 @@ export default function App() {
               BIS <span className="text-[var(--text-muted)] text-[10px] tracking-widest">BLISTER INSPECTION</span>
             </h1>
           </div>
-          <span className="text-[var(--text-muted)] text-[10px]">v2.0</span>
+          <div className="flex items-center gap-2">
+            {user && (
+              <span className="text-neutral-500 text-[10px]">{user.username}</span>
+            )}
+            {userIsAdmin && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="p-1 text-amber-500/60 hover:text-amber-400 transition-colors"
+                title="Admin Panel"
+              >
+                <Shield className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              onClick={handleLogout}
+              className="p-1 text-neutral-500 hover:text-red-400 transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </header>
 
         {/* Metrics bar */}
@@ -118,7 +148,7 @@ export default function App() {
         </div>
 
         {/* Main: Camera (fills space) + Sidebar */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-2">
           {/* Camera — fills all available space */}
           <div className="min-h-0 overflow-hidden">
             <DetectionOutput

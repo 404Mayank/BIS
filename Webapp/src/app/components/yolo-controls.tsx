@@ -1,7 +1,8 @@
 import React from 'react';
-import { Camera, CameraOff, Play, Square, Sun, Moon, ArrowLeftRight } from 'lucide-react';
+import { Camera, CameraOff, Play, Square, Sun, Moon, ArrowLeftRight, Pencil, Trash2 } from 'lucide-react';
 import type { ModelInfo } from '../services/inference-service';
 import type { CameraDevice } from '../hooks/use-camera';
+import { authFetch, isAdmin as checkIsAdmin } from '../services/auth-service';
 
 interface ControlsProps {
   models: ModelInfo[];
@@ -46,6 +47,9 @@ export function YoloControls({
 }: ControlsProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = React.useState(false);
+  const [renamingModel, setRenamingModel] = React.useState<string | null>(null);
+  const [renameValue, setRenameValue] = React.useState('');
+  const userIsAdmin = checkIsAdmin();
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -56,7 +60,7 @@ export function YoloControls({
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://localhost:8000/api/models/upload', {
+      const res = await authFetch('/api/models/upload', {
         method: 'POST',
         body: formData,
       });
@@ -72,6 +76,32 @@ export function YoloControls({
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRename = async (modelId: string) => {
+    if (!renameValue.trim()) return;
+    try {
+      const res = await authFetch(`/api/models/${modelId}/rename`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: renameValue.trim() }),
+      });
+      if (res.ok) {
+        setRenamingModel(null);
+        onModelUploaded(); // refresh list
+      }
+    } catch (err) {
+      console.error('Rename failed:', err);
+    }
+  };
+
+  const handleDelete = async (modelId: string) => {
+    if (!confirm(`Delete model "${modelId}"? This cannot be undone.`)) return;
+    try {
+      const res = await authFetch(`/api/models/${modelId}`, { method: 'DELETE' });
+      if (res.ok) onModelUploaded();
+    } catch (err) {
+      console.error('Delete failed:', err);
     }
   };
 
@@ -117,6 +147,44 @@ export function YoloControls({
                 </option>
               ))}
             </select>
+
+            {/* Model management buttons (admin only) */}
+            {userIsAdmin && selectedModel && (
+              <>
+                {renamingModel === selectedModel ? (
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleRename(selectedModel)}
+                      className="w-20 bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] text-[10px] px-1.5 py-1 focus:outline-none focus:border-[var(--accent)]"
+                      placeholder="New name"
+                      autoFocus
+                    />
+                    <button onClick={() => handleRename(selectedModel)} className="text-emerald-400 text-[10px] px-1">✓</button>
+                    <button onClick={() => setRenamingModel(null)} className="text-neutral-500 text-[10px] px-1">✕</button>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => { setRenamingModel(selectedModel); setRenameValue(''); }}
+                      className="p-1.5 text-neutral-500 hover:text-cyan-400 transition-colors"
+                      title="Rename model"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(selectedModel)}
+                      className="p-1.5 text-neutral-500 hover:text-red-400 transition-colors"
+                      title="Delete model"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </>
+                )}
+              </>
+            )}
 
             <input
               type="file"

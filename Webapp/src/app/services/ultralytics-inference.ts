@@ -4,6 +4,7 @@
  */
 
 import type { InferenceService, InferenceResult, CaptureResult, Detection } from './inference-service';
+import { getToken } from './auth-service';
 
 export class UltralyticsInferenceService implements InferenceService {
   private ws: WebSocket | null = null;
@@ -45,7 +46,9 @@ export class UltralyticsInferenceService implements InferenceService {
   private _connect(modelId: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(`${this.baseUrl}/ws/detect`);
+        const token = getToken();
+        const url = `${this.baseUrl}/ws/detect${token ? `?token=${token}` : ''}`;
+        this.ws = new WebSocket(url);
       } catch (e) {
         this._scheduleReconnect(modelId, resolve);
         return;
