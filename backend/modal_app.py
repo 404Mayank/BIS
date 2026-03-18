@@ -22,63 +22,42 @@ MODELS_DIR = f"{DATA_MOUNT}/models"
 DB_PATH = f"{DATA_MOUNT}/bis.db"
 
 # ---------------------------------------------------------------------------
-# Images
+# Single unified image (GPU + Web server in one container)
 # ---------------------------------------------------------------------------
-gpu_image = (
-    modal.Image.from_registry(
-        "nvidia/cuda:12.4.0-runtime-ubuntu22.04", add_python="3.11"
-    )
+app_image = (
+    modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
     .pip_install(
+        # Inference (PyTorch bundles its own CUDA)
         "ultralytics",
         "opencv-python-headless",
         "numpy",
-        "onnxruntime-gpu",
-    )
-    .run_commands(
-        "pip install tensorrt --extra-index-url https://pypi.nvidia.com",
-    )
-)
-
-cpu_image = (
-    modal.Image.debian_slim(python_version="3.11")
-    .pip_install(
+        # Web server
         "fastapi",
         "uvicorn",
         "bcrypt",
         "python-jose[cryptography]",
         "python-multipart",
         "websockets",
-        "numpy",
     )
 )
 
 # ---------------------------------------------------------------------------
-# GPU Inference Function (NVIDIA T4)
+# Local inference function (runs IN the web server container — no network hop)
 # ---------------------------------------------------------------------------
-@app.function(
-    gpu="T4",
-    image=gpu_image,
-    volumes={DATA_MOUNT: vol},
-    timeout=600,  # allow up to 10 min for first-time TensorRT export
-    scaledown_window=60,  # keep warm longer since engine loading is non-trivial
-)
+# Model cache lives at module scope — persists while the container is warm
+_model_cache: dict = {}
+
+
 def run_inference(model_id: str, frame_bytes: bytes, conf: float, action: str) -> dict:
-    """Run YOLO inference on a single frame, using TensorRT engine when available."""
+    """Run YOLO inference locally (same container as web server)."""
     import cv2
     import numpy as np
     from ultralytics import YOLO
     from pathlib import Path
-    import time
 
-    # --- Model cache (persists across calls while container is warm) ---
-    if not hasattr(run_inference, "_model_cache"):
-        run_inference._model_cache = {}
-
-    cache = run_inference._model_cache
-    models_dir = Path(MODELS_DIR)
-    pt_path = models_dir / f"{model_id}.pt"
-    engine_path = models_dir / f"{model_id}.engine"
+    cache = _model_cache
+    pt_path = Path(MODELS_DIR) / f"{model_id}.pt"
 
     # Ensure .pt exists (might have been uploaded recently)
     if not pt_path.exists():
@@ -86,30 +65,10 @@ def run_inference(model_id: str, frame_bytes: bytes, conf: float, action: str) -
         if not pt_path.exists():
             return {"error": f"Model {model_id} not found"}
 
-    # --- Lazy TensorRT export: .pt -> .engine (FP16 for T4) ---
+    # Load model (cached while container is warm)
     if model_id not in cache:
-        if engine_path.exists():
-            print(f"[GPU] Loading TensorRT engine for {model_id}")
-            cache[model_id] = YOLO(str(engine_path))
-        else:
-            print(f"[GPU] Exporting {model_id}.pt -> TensorRT .engine (FP16, imgsz=768)...")
-            t0 = time.time()
-            pt_model = YOLO(str(pt_path))
-            try:
-                exported = pt_model.export(
-                    format="engine",
-                    half=True,       # FP16 — 2x faster on T4
-                    imgsz=768,
-                    device=0,
-                    verbose=False,
-                )
-                elapsed = time.time() - t0
-                print(f"[GPU] TensorRT export done in {elapsed:.1f}s -> {exported}")
-                vol.commit()  # persist engine to Volume
-                cache[model_id] = YOLO(str(engine_path))
-            except Exception as e:
-                print(f"[GPU] TensorRT export failed ({e}), falling back to .pt")
-                cache[model_id] = pt_model
+        print(f"[GPU] Loading model {model_id}")
+        cache[model_id] = YOLO(str(pt_path))
 
     model = cache[model_id]
 
@@ -161,18 +120,18 @@ def run_inference(model_id: str, frame_bytes: bytes, conf: float, action: str) -
         response["total"] = len(detections)
 
     return response
-
-
 # ---------------------------------------------------------------------------
-# CPU Web Server (FastAPI + WebSocket)
+# GPU Web Server (FastAPI + WebSocket + inference in ONE container)
 # ---------------------------------------------------------------------------
 @app.function(
-    image=cpu_image,
+    gpu="T4",
+    image=app_image,
     cpu=1.0,
-    memory=1024,
+    memory=2048,
     volumes={DATA_MOUNT: vol},
-    scaledown_window=60,  # aggressive: CPU spins down 60s after last request
+    scaledown_window=60,
     secrets=[modal.Secret.from_name("bis-secrets")],
+    timeout=600,
 )
 @modal.concurrent(max_inputs=100)
 @modal.asgi_app()
@@ -640,8 +599,8 @@ def web_app():
                     frame_bytes = base64.b64decode(frame_b64)
 
                     try:
-                        # Dispatch to GPU function
-                        result = await run_inference.remote.aio(model_id, frame_bytes, conf, action)
+                        # Local inference — no network hop!
+                        result = run_inference(model_id, frame_bytes, conf, action)
                         await websocket.send_json(result)
                     except Exception as e:
                         print(f"Inference error: {e}")
