@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, CameraOff, Play, Square, Sun, Moon, ArrowLeftRight, Pencil, Trash2 } from 'lucide-react';
+import { Camera, CameraOff, Play, Square, Sun, Moon, ArrowLeftRight, Pencil, Trash2, Image as ImageIcon, Video } from 'lucide-react';
 import type { ModelInfo } from '../services/inference-service';
 import type { CameraDevice } from '../hooks/use-camera';
 import { authFetch, isAdmin as checkIsAdmin } from '../services/auth-service';
@@ -23,6 +23,8 @@ interface ControlsProps {
   theme: 'dark' | 'light';
   onThemeToggle: () => void;
   onCompareOpen: () => void;
+  inputMode?: 'live' | 'upload';
+  onInputModeChange?: (mode: 'live' | 'upload') => void;
 }
 
 export function YoloControls({
@@ -44,6 +46,8 @@ export function YoloControls({
   theme,
   onThemeToggle,
   onCompareOpen,
+  inputMode = 'live',
+  onInputModeChange,
 }: ControlsProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -208,7 +212,34 @@ export function YoloControls({
           </div>
         </ControlGroup>
 
-        {/* Camera Select */}
+        {/* Input Source */}
+        <ControlGroup label="Input Source">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => onInputModeChange?.('live')}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs border transition-colors ${
+                inputMode === 'live'
+                  ? 'border-cyan-700 bg-cyan-900/40 text-cyan-300'
+                  : 'border-neutral-700/50 bg-[var(--bg-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
+              }`}
+            >
+              <Video className="w-3.5 h-3.5" /> Live Camera
+            </button>
+            <button
+              onClick={() => onInputModeChange?.('upload')}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs border transition-colors ${
+                inputMode === 'upload'
+                  ? 'border-cyan-700 bg-cyan-900/40 text-cyan-300'
+                  : 'border-neutral-700/50 bg-[var(--bg-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
+              }`}
+            >
+              <ImageIcon className="w-3.5 h-3.5" /> Upload Image
+            </button>
+          </div>
+        </ControlGroup>
+
+        {/* Camera Select - Only show in live mode */}
+        {inputMode === 'live' && (
         <ControlGroup label="Camera">
           <select
             value={activeCamera}
@@ -229,6 +260,7 @@ export function YoloControls({
             <p className="text-red-400 text-[10px] mt-1">{cameraError}</p>
           )}
         </ControlGroup>
+        )}
 
         {/* Confidence */}
         <ControlGroup label={`Threshold: ${(confidenceThreshold * 100).toFixed(0)}%`}>
@@ -262,7 +294,8 @@ export function YoloControls({
           </div>
         </ControlGroup>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Only in live mode */}
+        {inputMode === 'live' && (
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
             onClick={onCameraToggle}
@@ -296,6 +329,7 @@ export function YoloControls({
             )}
           </button>
         </div>
+        )}
 
         {/* Compare Models Button */}
         {models.length >= 2 && (

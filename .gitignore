@@ -1,40 +1,44 @@
+# Environments
+venv/
+.venv/
+env/
+Webapp/venv/
+backend/venv/
+
+# Node.js
+node_modules/
+dist/
+build/
+.npm/
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Environments
-.venv/
-.env
-.env.*
-.venv*/
-
-# Packaging
-build/
-dist/
-*.egg-info/
-
-# Caches and tooling
 .pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-.coverage.*
-htmlcov/
-.cache/
 
-# Editors/OS
-.vscode/
-.idea/
-.DS_Store
-*.swp
-.ipynb_checkpoints/
+# Databases
+*.db
+*.sqlite3
+backend/bis.db
 
 # Logs
 *.log
+server.log
 
-# Node (in case of mixed projects)
-node_modules/
+# Large files & temporary downloads
+*.zip
+yolo8n/
+yolo8s/
 
-# Ultralytics/YOLO temp
-# (Keep runs committed if desired; large binaries handled via Git LFS)
+# Ignore all model files by default...
+*.pt
+# ...but explicitly keep the models inside backend/models/
+!backend/models/
+!backend/models/*.pt
+
+# OS / Editor files
+.DS_Store
+.vscode/
+.idea/
+*.swp

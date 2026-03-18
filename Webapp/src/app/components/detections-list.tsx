@@ -1,4 +1,4 @@
-import { Detection, getDetectionColor, getDetectionSeverity } from '../services/inference-service';
+import { Detection, getDetectionColor } from '../services/inference-service';
 
 interface DetectionsListProps {
   detections: Detection[];

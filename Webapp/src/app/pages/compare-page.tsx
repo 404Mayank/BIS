@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { ArrowLeft, Camera } from 'lucide-react';
 import { ModelCompare } from '../components/model-compare';
 import { useCamera } from '../hooks/use-camera';
+import { authFetch } from '../services/auth-service';
 import type { ModelInfo } from '../services/inference-service';
 
 export function ComparePage() {
@@ -12,7 +13,7 @@ export function ComparePage() {
 
   const fetchModels = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/models');
+      const response = await authFetch('/api/models');
       const data = await response.json();
       setModels(data);
     } catch (err) {

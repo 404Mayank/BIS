@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from auth import (
     create_user, authenticate_user, create_token, create_guest_token, decode_token,
     get_current_user, require_admin, get_user_by_id,
-    list_users, set_user_approved, set_session_minutes, delete_user,
+    list_users, set_user_approved, set_session_minutes, set_user_role, delete_user,
     GUEST_SESSION_MINUTES
 )
 
@@ -35,6 +35,13 @@ TARGET_SIZE = 768
 
 # Global dictionary to cache loaded models
 loaded_models: dict[str, YOLO] = {}
+
+# Track temporary models uploaded by non-admin users: model_id -> user_id
+# These get cleaned up when the user's last WebSocket disconnects
+temp_models: dict[str, int] = {}
+
+# Track active WebSocket connections per user_id
+active_connections: dict[int, int] = {}
 
 
 # --- Pydantic models ---
@@ -164,6 +171,21 @@ async def admin_set_session(
     return updated
 
 
+class RoleRequest(BaseModel):
+    role: str
+
+
+@app.patch("/api/admin/users/{user_id}/role")
+async def admin_set_role(
+    user_id: int, req: RoleRequest, admin: dict = Depends(require_admin)
+):
+    """Change a user's role (admin/user)."""
+    updated = set_user_role(user_id, req.role)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated
+
+
 # --- Model endpoints ---
 
 def get_available_models():
@@ -189,7 +211,7 @@ async def list_models_endpoint(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/models/upload")
-async def upload_model(file: UploadFile = File(...), user: dict = Depends(require_admin)):
+async def upload_model(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
     """Upload a new .pt YOLO model. Admin only."""
     if not file.filename.endswith('.pt'):
         raise HTTPException(status_code=400, detail="Only .pt files are supported.")
@@ -199,6 +221,12 @@ async def upload_model(file: UploadFile = File(...), user: dict = Depends(requir
         content = await file.read()
         with open(file_path, "wb") as f:
             f.write(content)
+
+        # Track non-admin uploads as temporary
+        if user.get("role") != "admin":
+            model_id = file.filename.rsplit('.', 1)[0]
+            temp_models[model_id] = user.get("id", 0)
+
         return JSONResponse({"message": "Model uploaded successfully", "filename": file.filename})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -324,26 +352,36 @@ async def websocket_detect(websocket: WebSocket, token: str = Query(None)):
     """WebSocket endpoint for real-time YOLO inference. Requires auth token."""
     # Validate token before accepting
     if not token:
+        print("WS: No token provided")
         await websocket.close(code=4001, reason="Token required")
         return
 
     try:
         payload = decode_token(token)
+        print(f"WS: Token decoded, sub={payload.get('sub')}, role={payload.get('role')}")
         # Guest users don't have DB records
         if payload.get("sub") == "guest":
             user = {"id": 0, "username": "guest", "role": "guest", "approved": 1}
         else:
             user_id = int(payload["sub"])
             user = get_user_by_id(user_id)
-            if not user or not user["approved"]:
+            if not user:
+                print(f"WS: User id={user_id} not found in DB")
                 await websocket.close(code=4003, reason="Access denied")
                 return
-    except Exception:
+            if not user["approved"]:
+                print(f"WS: User id={user_id} not approved")
+                await websocket.close(code=4003, reason="Access denied")
+                return
+    except Exception as e:
+        print(f"WS: Token decode failed: {e}")
         await websocket.close(code=4001, reason="Invalid token")
         return
 
     await websocket.accept()
-    print(f"Client connected: {user['username']}")
+    uid = user.get("id", 0)
+    active_connections[uid] = active_connections.get(uid, 0) + 1
+    print(f"Client connected: {user['username']} (connections: {active_connections[uid]})")
 
     try:
         while True:
@@ -442,7 +480,19 @@ async def websocket_detect(websocket: WebSocket, token: str = Query(None)):
             await websocket.close()
         except:
             pass
-        try:
-            await websocket.close()
-        except:
-            pass
+    finally:
+        # Decrement connection counter
+        uid = user.get("id", 0)
+        active_connections[uid] = max(0, active_connections.get(uid, 1) - 1)
+        print(f"User {user['username']} connections remaining: {active_connections[uid]}")
+
+        # Only clean up temp models when the last connection closes
+        if active_connections[uid] == 0 and user.get("role") != "admin":
+            to_remove = [mid for mid, owner in temp_models.items() if owner == uid]
+            for model_id in to_remove:
+                model_path = MODELS_DIR / f"{model_id}.pt"
+                if model_path.exists():
+                    model_path.unlink()
+                    print(f"Cleaned up temp model: {model_id} (user: {user['username']})")
+                loaded_models.pop(model_id, None)
+                del temp_models[model_id]

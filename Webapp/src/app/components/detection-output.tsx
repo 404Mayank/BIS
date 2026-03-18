@@ -21,7 +21,7 @@ export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, on
     setCaptureResult(null);
     try {
       const result = await onCapture();
-      if (result && result.total > 0) {
+      if (result) {
         setCaptureResult(result);
       }
     } finally {
@@ -38,10 +38,10 @@ export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, on
           Live Feed
         </span>
         <div className="flex items-center gap-2">
-          {isCameraOn && !isRunning && onCapture && (
+          {onCapture && (
             <button
               onClick={handleCapture}
-              disabled={isCapturing}
+              disabled={isCapturing || isRunning || !isCameraOn}
               className="flex items-center gap-1 px-2 py-1 text-[10px] bg-cyan-900/40 hover:bg-cyan-800/50 border border-cyan-700/40 text-cyan-300 tracking-wider uppercase transition-colors disabled:opacity-50"
             >
               {isCapturing ? (
@@ -52,14 +52,12 @@ export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, on
               Capture
             </button>
           )}
-          {isCameraOn && (
-            <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-red-500 animate-pulse' : 'bg-emerald-400'}`} />
-              <span className={`text-[10px] tracking-wider uppercase ${isRunning ? 'text-red-400' : 'text-emerald-400'}`}>
-                {isRunning ? 'DETECTING' : 'LIVE'}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${!isCameraOn ? 'bg-[var(--text-muted)]' : isRunning ? 'bg-red-500 animate-pulse' : 'bg-emerald-400'}`} />
+            <span className={`text-[10px] tracking-wider uppercase ${!isCameraOn ? 'text-[var(--text-muted)]' : isRunning ? 'text-red-400' : 'text-emerald-400'}`}>
+              {!isCameraOn ? 'OFFLINE' : isRunning ? 'DETECTING' : 'LIVE'}
+            </span>
+          </div>
         </div>
       </div>
 

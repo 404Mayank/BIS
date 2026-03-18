@@ -7,6 +7,7 @@ import { MetricsPanel } from './components/metrics-panel';
 import { DetectionsList } from './components/detections-list';
 import { LoadingOverlay } from './components/loading-overlay';
 import { SessionTimer } from './components/session-timer';
+import { ImageUploadPreview } from './components/image-upload-preview';
 import { useCamera } from './hooks/use-camera';
 import { useInference } from './hooks/use-inference';
 import { UltralyticsInferenceService } from './services/ultralytics-inference';
@@ -25,6 +26,8 @@ export default function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.25);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [inputMode, setInputMode] = useState<'live' | 'upload'>('live');
+  const [staticDetections, setStaticDetections] = useState<any[]>([]);
 
   const camera = useCamera();
 
@@ -155,15 +158,24 @@ export default function App() {
 
         {/* Main: Camera (fills space) + Sidebar */}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
-          {/* Camera — fills all available space */}
+          {/* Main Content Area */}
           <div className="min-h-0 overflow-hidden">
-            <DetectionOutput
-              canvasRef={canvasRef}
-              videoRef={camera.videoRef}
-              isRunning={isRunning}
-              isCameraOn={camera.isOn}
-              onCapture={isModelLoaded && camera.isOn ? handleCapture : undefined}
-            />
+            {inputMode === 'live' ? (
+              <DetectionOutput
+                canvasRef={canvasRef}
+                videoRef={camera.videoRef}
+                isRunning={isRunning}
+                isCameraOn={camera.isOn}
+                onCapture={isModelLoaded && camera.isOn ? handleCapture : undefined}
+              />
+            ) : (
+              <ImageUploadPreview
+                inferenceService={inferenceService}
+                confidenceThreshold={confidenceThreshold}
+                isModelLoaded={isModelLoaded}
+                onDetectionsChange={setStaticDetections}
+              />
+            )}
           </div>
 
           {/* Sidebar */}
@@ -187,8 +199,10 @@ export default function App() {
               theme={theme}
               onThemeToggle={toggleTheme}
               onCompareOpen={() => navigate('/compare-models')}
+              inputMode={inputMode}
+              onInputModeChange={setInputMode}
             />
-            <DetectionsList detections={detections} />
+            <DetectionsList detections={inputMode === 'live' ? detections : staticDetections} />
           </div>
         </div>
       </div>

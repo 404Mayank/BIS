@@ -30,13 +30,14 @@ export interface CaptureResult extends InferenceResult {
 export interface InferenceService {
   loadModel(modelId: string): Promise<void>;
   runInference(
-    videoElement: HTMLVideoElement,
+    videoElement: HTMLVideoElement | HTMLImageElement,
     confidenceThreshold: number
   ): InferenceResult;
   captureFrame(
-    videoElement: HTMLVideoElement,
+    videoElement: HTMLVideoElement | HTMLImageElement,
     confidenceThreshold: number
   ): Promise<CaptureResult>;
+  getFps(): number;
   dispose(): void;
 }
 

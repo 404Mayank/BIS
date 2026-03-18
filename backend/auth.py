@@ -117,11 +117,31 @@ def set_user_approved(user_id: int, approved: bool) -> dict | None:
 
 
 def set_session_minutes(user_id: int, minutes: int) -> dict | None:
-    """Set the session duration for a user (admin action)."""
-    if minutes < 1 or minutes > 10080:  # 1 min to 7 days
-        raise HTTPException(status_code=400, detail="Session must be 1–10080 minutes")
+    """Set the session duration for a user. 0 = infinite."""
+    if minutes < 0 or minutes > 10080:  # 0 (infinite) to 7 days
+        raise HTTPException(status_code=400, detail="Session must be 0 (infinite) to 10080 minutes")
     conn = get_db()
     conn.execute("UPDATE users SET session_minutes = ? WHERE id = ?", (minutes, user_id))
+    conn.commit()
+    user = conn.execute("SELECT id, username, role, approved, session_minutes, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    return dict(user) if user else None
+
+
+def set_user_role(user_id: int, role: str) -> dict | None:
+    """Change user role (admin action). Prevents removing the last admin."""
+    if role not in ("admin", "user"):
+        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'user'")
+    conn = get_db()
+    # Prevent removing the last admin
+    if role == "user":
+        current = conn.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
+        if current and current["role"] == "admin":
+            admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE role = 'admin'").fetchone()[0]
+            if admin_count <= 1:
+                conn.close()
+                raise HTTPException(status_code=400, detail="Cannot demote the last admin")
+    conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
     conn.commit()
     user = conn.execute("SELECT id, username, role, approved, session_minutes, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
@@ -149,6 +169,8 @@ def delete_user(user_id: int) -> bool:
 def create_token(user: dict) -> str:
     """Create a JWT token for the given user."""
     minutes = user.get("session_minutes", DEFAULT_SESSION_MINUTES)
+    if minutes == 0:  # 0 means infinite — use 30 days
+        minutes = 60 * 24 * 30
     expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
     payload = {
         "sub": str(user["id"]),

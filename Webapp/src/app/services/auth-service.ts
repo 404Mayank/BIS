@@ -37,7 +37,7 @@ function setAllStores(key: string, value: string) {
 export function getToken(): string | null {
   // Check session expiry
   const expires = getStore().getItem(EXPIRES_KEY);
-  if (expires && Date.now() > parseInt(expires)) {
+  if (expires && expires !== '0' && Date.now() > parseInt(expires)) {
     logout();
     return null;
   }
@@ -85,10 +85,14 @@ function saveAuth(data: AuthResponse, remember: boolean = false) {
   store.setItem(TOKEN_KEY, data.token);
   store.setItem(USER_KEY, JSON.stringify(data.user));
 
-  // Calculate expiry from session_minutes
-  const sessionMin = data.user.session_minutes || 5;
-  const expiresAt = Date.now() + sessionMin * 60 * 1000;
-  store.setItem(EXPIRES_KEY, String(expiresAt));
+  // Calculate expiry from session_minutes (0 = infinite)
+  const sessionMin = data.user.session_minutes;
+  if (sessionMin && sessionMin > 0) {
+    const expiresAt = Date.now() + sessionMin * 60 * 1000;
+    store.setItem(EXPIRES_KEY, String(expiresAt));
+  } else {
+    store.setItem(EXPIRES_KEY, '0');  // 0 = infinite, no expiry
+  }
 }
 
 export function logout() {

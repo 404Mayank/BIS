@@ -27,6 +27,96 @@
   --text-muted: #a3a3a3;
   --accent: #0891b2;
   --accent-muted: rgba(8, 145, 178, 0.7);
+  color-scheme: light;
+}
+
+/* ── Light-mode overrides for hardcoded Tailwind dark colors ─────── */
+
+/* Backgrounds */
+.theme-light .bg-neutral-950,
+.theme-light .bg-neutral-950\/95 {
+  background-color: #f0f0f0 !important;
+}
+.theme-light .bg-neutral-900,
+.theme-light .bg-neutral-900\/80,
+.theme-light .bg-neutral-900\/50 {
+  background-color: #e5e5e5 !important;
+}
+.theme-light .bg-neutral-800,
+.theme-light .bg-neutral-800\/60,
+.theme-light .bg-neutral-800\/50,
+.theme-light .bg-neutral-800\/40,
+.theme-light .bg-neutral-800\/30 {
+  background-color: rgba(229, 229, 229, 0.5) !important;
+}
+.theme-light .bg-neutral-700\/30,
+.theme-light .bg-neutral-700\/40 {
+  background-color: rgba(212, 212, 212, 0.3) !important;
+}
+
+/* Hover backgrounds */
+.theme-light .hover\:bg-neutral-700:hover,
+.theme-light .hover\:bg-neutral-700\/60:hover,
+.theme-light .hover\:bg-neutral-700\/40:hover,
+.theme-light .hover\:bg-neutral-700\/30:hover,
+.theme-light .hover\:bg-neutral-800\/40:hover {
+  background-color: rgba(212, 212, 212, 0.4) !important;
+}
+
+/* Borders */
+.theme-light .border-neutral-700\/50,
+.theme-light .border-neutral-700\/40,
+.theme-light .border-neutral-700\/60,
+.theme-light .border-neutral-700,
+.theme-light .border-neutral-600 {
+  border-color: rgba(212, 212, 212, 0.6) !important;
+}
+.theme-light .divide-neutral-700\/30 > * + * {
+  border-color: rgba(212, 212, 212, 0.4) !important;
+}
+
+/* Text — ensure all neutrals are dark enough to read on light backgrounds */
+.theme-light .text-neutral-200 { color: #1f2937 !important; }
+.theme-light .text-neutral-300 { color: #374151 !important; }
+.theme-light .text-neutral-400 { color: #4b5563 !important; }
+.theme-light .text-neutral-500 { color: #6b7280 !important; }
+.theme-light .text-neutral-600 { color: #9ca3af !important; }
+.theme-light .text-neutral-700 { color: #9ca3af !important; }
+
+/* Hover text */
+.theme-light .hover\:text-white:hover,
+.theme-light .hover\:text-neutral-300:hover {
+  color: #171717 !important;
+}
+
+/* Inputs and selects */
+.theme-light select,
+.theme-light input[type="text"],
+.theme-light input[type="password"],
+.theme-light input[type="number"] {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Colored semitransparent backgrounds */
+.theme-light .bg-cyan-900\/40,
+.theme-light .bg-cyan-900\/50,
+.theme-light .bg-cyan-800\/50 {
+  background-color: rgba(8, 145, 178, 0.12) !important;
+}
+.theme-light .bg-red-950\/50 {
+  background-color: rgba(220, 38, 38, 0.08) !important;
+}
+.theme-light .bg-emerald-950\/50 {
+  background-color: rgba(16, 185, 129, 0.08) !important;
+}
+.theme-light .bg-amber-900\/30,
+.theme-light .bg-amber-950\/20 {
+  background-color: rgba(217, 119, 6, 0.1) !important;
+}
+.theme-light .bg-black {
+  background-color: #f0f0f0 !important;
 }
 
 html,

@@ -5,7 +5,7 @@
  * Replace with UltralyticsInferenceService for production.
  */
 
-import type { InferenceService, InferenceResult } from './inference-service';
+import type { InferenceService, InferenceResult, CaptureResult } from './inference-service';
 
 const CLASSES = ['good pill', 'missing pill', 'broken pill', 'empty pocket', 'color defect'];
 const CLASS_WEIGHTS = [0.4, 0.15, 0.15, 0.15, 0.15]; // good pills more common
@@ -21,16 +21,14 @@ function weightedRandomClass(): string {
 }
 
 export class MockInferenceService implements InferenceService {
-  private _loaded = false;
 
   async loadModel(_modelId: string): Promise<void> {
     // Simulate network + initialization delay
     await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
-    this._loaded = true;
   }
 
   runInference(
-    _videoElement: HTMLVideoElement,
+    _videoElement: HTMLVideoElement | HTMLImageElement,
     confidenceThreshold: number
   ): InferenceResult {
     const start = performance.now();
@@ -54,17 +52,30 @@ export class MockInferenceService implements InferenceService {
       }
     }
 
-    // Simulate realistic inference time (15-45ms)
     const elapsed = performance.now() - start;
-    const simulatedTime = 15 + Math.random() * 30;
 
     return {
       detections,
-      inferenceTimeMs: Math.max(elapsed, simulatedTime),
+      inferenceTimeMs: elapsed,
+    };
+  }
+
+  getFps(): number {
+    return 30; // Mock FPS
+  }
+
+  async captureFrame(
+    videoElement: HTMLVideoElement | HTMLImageElement,
+    confidenceThreshold: number
+  ): Promise<CaptureResult> {
+    const result = await this.runInference(videoElement, confidenceThreshold);
+    return {
+      ...result,
+      summary: {},
+      total: result.detections.length,
     };
   }
 
   dispose(): void {
-    this._loaded = false;
   }
 }

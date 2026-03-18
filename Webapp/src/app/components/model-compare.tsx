@@ -26,6 +26,7 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
     { id: `slot-${slotCounter++}`, modelId: '', result: null, isLoading: false },
   ]);
   const [isComparing, setIsComparing] = useState(false);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.25);
 
   const servicesRef = useRef<Map<string, UltralyticsInferenceService>>(new Map());
 
@@ -78,7 +79,7 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
       const results = await Promise.all(
         validSlots.map(async slot => {
           const service = getService(slot.id);
-          const result = await service.captureFrame(videoRef.current!, 0.25);
+          const result = await service.captureFrame(videoRef.current!, confidenceThreshold);
           return { slotId: slot.id, result };
         })
       );
@@ -93,7 +94,7 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
     } finally {
       setIsComparing(false);
     }
-  }, [slots, videoRef, isCameraOn, getService]);
+  }, [slots, videoRef, isCameraOn, getService, confidenceThreshold]);
 
   const validCount = slots.filter(s => s.modelId).length;
   const hasResults = slots.some(s => s.result);
@@ -115,7 +116,9 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
                 className="bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] text-xs px-2 py-1.5 focus:outline-none focus:border-[var(--accent)] min-w-[120px] max-w-[180px]"
               >
                 <option value="">Model {i + 1}...</option>
-                {models.map(m => (
+                {models.filter(m =>
+                  m.id === slot.modelId || !slots.some(s => s.id !== slot.id && s.modelId === m.id)
+                ).map(m => (
                   <option key={m.id} value={m.id}>{m.name} ({m.size})</option>
                 ))}
               </select>
@@ -159,6 +162,33 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
         {!isCameraOn && (
           <p className="text-amber-400/60 text-[10px] mt-1">Enable camera to capture comparison frames</p>
         )}
+
+        {/* Threshold slider */}
+        <div className="flex items-center gap-3 mt-2">
+          <label className="text-[var(--text-muted)] text-[10px] tracking-wider uppercase shrink-0">
+            Threshold: {(confidenceThreshold * 100).toFixed(0)}%
+          </label>
+          <input
+            type="range"
+            min={0.1}
+            max={1.0}
+            step={0.05}
+            value={confidenceThreshold}
+            onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+            className="flex-1 h-1 bg-neutral-700 appearance-none cursor-pointer
+              [&::-webkit-slider-thumb]:appearance-none
+              [&::-webkit-slider-thumb]:w-3
+              [&::-webkit-slider-thumb]:h-3
+              [&::-webkit-slider-thumb]:rounded-none
+              [&::-webkit-slider-thumb]:bg-cyan-400
+              [&::-webkit-slider-thumb]:border-0
+              [&::-moz-range-thumb]:w-3
+              [&::-moz-range-thumb]:h-3
+              [&::-moz-range-thumb]:rounded-none
+              [&::-moz-range-thumb]:bg-cyan-400
+              [&::-moz-range-thumb]:border-0"
+          />
+        </div>
       </div>
 
       {/* Results area — fills remaining space */}

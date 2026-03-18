@@ -22,8 +22,6 @@ export function useInference({
   const [detections, setDetections] = useState<Detection[]>([]);
 
   const rafRef = useRef<number | null>(null);
-  const lastFrameTime = useRef(0);
-  const fpsBuffer = useRef<number[]>([]);
 
   const processFrame = useCallback(() => {
     const video = videoRef.current;
@@ -36,27 +34,18 @@ export function useInference({
       return;
     }
 
-    // FPS calculation with smoothing
-    const now = performance.now();
-    if (lastFrameTime.current) {
-      const delta = now - lastFrameTime.current;
-      const instantFps = 1000 / delta;
-      fpsBuffer.current.push(instantFps);
-      if (fpsBuffer.current.length > 10) fpsBuffer.current.shift();
-      const avgFps = fpsBuffer.current.reduce((a: number, b: number) => a + b, 0) / fpsBuffer.current.length;
-      setFps(Math.round(avgFps));
-    }
-    lastFrameTime.current = now;
-
     // Resize canvas to match video, clear for transparent overlay
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Run inference
+    // Run inference — synchronous fire-and-forget; returns last result immediately
     const result = service.runInference(video, confidenceThreshold);
     setDetections(result.detections);
     setInferenceTime(result.inferenceTimeMs);
+
+    // Read FPS from service (measured on actual WS result arrivals)
+    setFps(service.getFps());
 
     // Draw segmentation masks first (underneath bounding boxes)
     result.detections.forEach((det: Detection) => {
@@ -73,11 +62,8 @@ export function useInference({
         }
         ctx.closePath();
 
-        // Fill mask
         ctx.fillStyle = fillColor;
         ctx.fill();
-
-        // Stroke outline
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 2;
         ctx.stroke();
@@ -146,8 +132,6 @@ export function useInference({
 
   useEffect(() => {
     if (enabled) {
-      lastFrameTime.current = 0;
-      fpsBuffer.current = [];
       processFrame();
     } else {
       if (rafRef.current) {
@@ -167,6 +151,7 @@ export function useInference({
     return () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
     };
   }, [enabled, processFrame]);

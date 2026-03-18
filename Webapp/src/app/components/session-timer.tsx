@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { getSessionExpiry, logout } from '../services/auth-service';
+import { getSessionExpiry, logout, isAdmin } from '../services/auth-service';
 import { Clock } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 export function SessionTimer() {
   const [timeLeft, setTimeLeft] = useState<string>('');
   const navigate = useNavigate();
+  const admin = isAdmin();
 
   useEffect(() => {
+    if (admin) return; // Admins don't have session limits
     const expiry = getSessionExpiry();
-    if (!expiry) return;
+    if (!expiry || expiry === 0) return; // 0 = infinite session
 
     const updateTimer = () => {
       const now = Date.now();
