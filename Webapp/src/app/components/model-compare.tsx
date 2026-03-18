@@ -27,12 +27,14 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
   ]);
   const [isComparing, setIsComparing] = useState(false);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.25);
+  const [compareStatus, setCompareStatus] = useState<string>('');
 
   const servicesRef = useRef<Map<string, UltralyticsInferenceService>>(new Map());
 
   const getService = useCallback((slotId: string) => {
     if (!servicesRef.current.has(slotId)) {
-      servicesRef.current.set(slotId, new UltralyticsInferenceService('ws://localhost:8000'));
+      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+      servicesRef.current.set(slotId, new UltralyticsInferenceService(wsUrl));
     }
     return servicesRef.current.get(slotId)!;
   }, []);
@@ -67,6 +69,8 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
     setSlots(prev => prev.map(s => ({ ...s, result: null, isLoading: !!s.modelId })));
 
     try {
+      // Stage 1: Load models
+      setCompareStatus(`Loading ${validSlots.length} models…`);
       await Promise.all(
         validSlots.map(async slot => {
           const service = getService(slot.id);
@@ -74,8 +78,12 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
         })
       );
 
+      // Stage 2: Capture frame
+      setCompareStatus('Capturing frame…');
       await new Promise(r => setTimeout(r, 500));
 
+      // Stage 3: Run inference
+      setCompareStatus('Running inference on all models…');
       const results = await Promise.all(
         validSlots.map(async slot => {
           const service = getService(slot.id);
@@ -93,6 +101,7 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
       setSlots(prev => prev.map(s => ({ ...s, isLoading: false })));
     } finally {
       setIsComparing(false);
+      setCompareStatus('');
     }
   }, [slots, videoRef, isCameraOn, getService, confidenceThreshold]);
 
@@ -193,12 +202,20 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
 
       {/* Results area — fills remaining space */}
       <div className="flex-1 min-h-0 overflow-y-auto p-2">
-        {!hasResults ? (
+        {!hasResults && !isComparing ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center space-y-3">
               <ArrowLeftRight className="w-10 h-10 mx-auto text-neutral-700" />
               <p className="text-neutral-500 text-sm">Select models and click Compare</p>
               <p className="text-neutral-600 text-xs">Each model will analyze the same camera frame</p>
+            </div>
+          </div>
+        ) : isComparing && !hasResults ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <Loader2 className="w-8 h-8 mx-auto text-cyan-400 animate-spin" />
+              <p className="text-cyan-300 text-sm">{compareStatus || 'Comparing…'}</p>
+              <p className="text-neutral-600 text-[10px]">This may take a moment if the GPU is cold-starting</p>
             </div>
           </div>
         ) : (
