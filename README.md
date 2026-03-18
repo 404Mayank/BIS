@@ -1,3 +1,4 @@
+=======
 # BIS — Blister Inspection System
 
 Real-time blister pack quality inspection powered by YOLO segmentation models. Detects **Full** (pill present), **Empty** (missing pill), and **Blister** (pack structure) classes with live segmentation overlays.
