@@ -25,12 +25,18 @@ DB_PATH = f"{DATA_MOUNT}/bis.db"
 # Images
 # ---------------------------------------------------------------------------
 gpu_image = (
-    modal.Image.debian_slim(python_version="3.11")
+    modal.Image.from_registry(
+        "nvidia/cuda:12.4.0-runtime-ubuntu22.04", add_python="3.11"
+    )
     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
     .pip_install(
         "ultralytics",
         "opencv-python-headless",
         "numpy",
+        "onnxruntime-gpu",
+    )
+    .run_commands(
+        "pip install tensorrt --extra-index-url https://pypi.nvidia.com",
     )
 )
 
@@ -54,31 +60,56 @@ cpu_image = (
     gpu="T4",
     image=gpu_image,
     volumes={DATA_MOUNT: vol},
-    timeout=120,
-    scaledown_window=30,  # aggressive: GPU spins down 30s after last call
+    timeout=600,  # allow up to 10 min for first-time TensorRT export
+    scaledown_window=60,  # keep warm longer since engine loading is non-trivial
 )
 def run_inference(model_id: str, frame_bytes: bytes, conf: float, action: str) -> dict:
-    """Run YOLO inference on a single frame. Called from the CPU web server."""
+    """Run YOLO inference on a single frame, using TensorRT engine when available."""
     import cv2
     import numpy as np
     from ultralytics import YOLO
     from pathlib import Path
+    import time
 
     # --- Model cache (persists across calls while container is warm) ---
     if not hasattr(run_inference, "_model_cache"):
         run_inference._model_cache = {}
 
     cache = run_inference._model_cache
-    model_path = Path(MODELS_DIR) / f"{model_id}.pt"
+    models_dir = Path(MODELS_DIR)
+    pt_path = models_dir / f"{model_id}.pt"
+    engine_path = models_dir / f"{model_id}.engine"
 
-    if not model_path.exists():
-        vol.reload()  # in case it was just uploaded
-        if not model_path.exists():
+    # Ensure .pt exists (might have been uploaded recently)
+    if not pt_path.exists():
+        vol.reload()
+        if not pt_path.exists():
             return {"error": f"Model {model_id} not found"}
 
+    # --- Lazy TensorRT export: .pt -> .engine (FP16 for T4) ---
     if model_id not in cache:
-        print(f"[GPU] Loading model {model_id} from {model_path}")
-        cache[model_id] = YOLO(str(model_path))
+        if engine_path.exists():
+            print(f"[GPU] Loading TensorRT engine for {model_id}")
+            cache[model_id] = YOLO(str(engine_path))
+        else:
+            print(f"[GPU] Exporting {model_id}.pt -> TensorRT .engine (FP16, imgsz=768)...")
+            t0 = time.time()
+            pt_model = YOLO(str(pt_path))
+            try:
+                exported = pt_model.export(
+                    format="engine",
+                    half=True,       # FP16 — 2x faster on T4
+                    imgsz=768,
+                    device=0,
+                    verbose=False,
+                )
+                elapsed = time.time() - t0
+                print(f"[GPU] TensorRT export done in {elapsed:.1f}s -> {exported}")
+                vol.commit()  # persist engine to Volume
+                cache[model_id] = YOLO(str(engine_path))
+            except Exception as e:
+                print(f"[GPU] TensorRT export failed ({e}), falling back to .pt")
+                cache[model_id] = pt_model
 
     model = cache[model_id]
 
@@ -88,22 +119,8 @@ def run_inference(model_id: str, frame_bytes: bytes, conf: float, action: str) -
     if img is None:
         return {"error": "Failed to decode frame"}
 
-    # --- Letterbox to 768 ---
-    TARGET_SIZE = 768
-    h, w = img.shape[:2]
-    scale = TARGET_SIZE / max(h, w)
-    new_w, new_h = int(w * scale), int(h * scale)
-    resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-    pad_w = (TARGET_SIZE - new_w) // 2
-    pad_h = (TARGET_SIZE - new_h) // 2
-    padded = cv2.copyMakeBorder(
-        resized, pad_h, TARGET_SIZE - new_h - pad_h,
-        pad_w, TARGET_SIZE - new_w - pad_w,
-        cv2.BORDER_CONSTANT, value=(114, 114, 114),
-    )
-
-    # --- Inference ---
-    results = model(padded, conf=conf, verbose=False)
+    # --- Inference (model handles preprocessing internally) ---
+    results = model(img, conf=conf, imgsz=768, verbose=False)
     speed = results[0].speed
     inf_time = speed["inference"]
 
