@@ -9,6 +9,8 @@ import { getToken } from './auth-service';
 // Max dimension to resize frames to before sending (matches model imgsz)
 const FRAME_MAX_DIM = 768;
 
+export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+
 export class UltralyticsInferenceService implements InferenceService {
   private ws: WebSocket | null = null;
   private baseUrl: string;
@@ -29,6 +31,10 @@ export class UltralyticsInferenceService implements InferenceService {
   private maxReconnectDelay: number = 30000;
   private shouldReconnect: boolean = false;
   private onReconnect: (() => void) | null = null;
+
+  // Connection state callback
+  private _connectionState: ConnectionState = 'disconnected';
+  onConnectionState: ((state: ConnectionState) => void) | null = null;
 
   // Capture mode
   private captureResolve: ((result: CaptureResult) => void) | null = null;
@@ -76,8 +82,18 @@ export class UltralyticsInferenceService implements InferenceService {
     return this._connect(modelId);
   }
 
+  private _setConnectionState(state: ConnectionState) {
+    this._connectionState = state;
+    this.onConnectionState?.(state);
+  }
+
+  get connectionState(): ConnectionState {
+    return this._connectionState;
+  }
+
   private _connect(modelId: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      this._setConnectionState('connecting');
       try {
         const token = getToken();
         const url = `${this.baseUrl}/ws/detect${token ? `?token=${token}` : ''}`;
@@ -92,6 +108,7 @@ export class UltralyticsInferenceService implements InferenceService {
       this.ws.onopen = () => {
         opened = true;
         this.reconnectDelay = 1000;
+        this._setConnectionState('connected');
         this.ws?.send(JSON.stringify({ action: 'load_model', model: modelId }));
         resolve();
       };
@@ -148,18 +165,22 @@ export class UltralyticsInferenceService implements InferenceService {
 
       this.ws.onerror = () => {
         this.pendingInference = false;
+        this._setConnectionState('error');
       };
 
       this.ws.onclose = (event) => {
         this.pendingInference = false;
         if (!opened) {
-          // Never connected — likely auth failure
+          this._setConnectionState('error');
           reject(new Error(`WebSocket rejected (code ${event.code})`));
           return;
         }
         if (this.shouldReconnect) {
           console.warn('WebSocket closed, attempting reconnect...');
+          this._setConnectionState('reconnecting');
           this._scheduleReconnect(modelId);
+        } else {
+          this._setConnectionState('disconnected');
         }
       };
     });

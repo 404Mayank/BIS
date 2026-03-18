@@ -5,7 +5,7 @@ import { YoloControls } from './components/yolo-controls';
 import { DetectionOutput } from './components/detection-output';
 import { MetricsPanel } from './components/metrics-panel';
 import { DetectionsList } from './components/detections-list';
-import { LoadingOverlay } from './components/loading-overlay';
+import { LoadingOverlay, ConnectionBanner } from './components/loading-overlay';
 import { SessionTimer } from './components/session-timer';
 import { ImageUploadPreview } from './components/image-upload-preview';
 import { useCamera } from './hooks/use-camera';
@@ -13,11 +13,19 @@ import { useInference } from './hooks/use-inference';
 import { UltralyticsInferenceService } from './services/ultralytics-inference';
 import { getUser, isAdmin, logout, authFetch } from './services/auth-service';
 import type { ModelInfo, CaptureResult } from './services/inference-service';
+import type { ConnectionState } from './services/ultralytics-inference';
 
 export default function App() {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inferenceService = useMemo(() => new UltralyticsInferenceService(), []);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+
+  // Track WebSocket connection state for loading UI
+  useEffect(() => {
+    inferenceService.onConnectionState = (state) => setConnectionState(state);
+    return () => { inferenceService.onConnectionState = null; };
+  }, [inferenceService]);
 
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
@@ -106,10 +114,19 @@ export default function App() {
 
   return (
     <>
-      {isModelLoading && <LoadingOverlay modelName={selectedModel} />}
+      {isModelLoading && (
+        <LoadingOverlay
+          modelName={selectedModel}
+          isConnecting={connectionState === 'connecting' || connectionState === 'reconnecting'}
+        />
+      )}
 
       {/* Full viewport HUD — no scrolling on desktop */}
       <div className="h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-mono flex flex-col overflow-hidden p-2 sm:p-3">
+        {/* Connection banner for reconnections (not during initial model load) */}
+        {!isModelLoading && (connectionState === 'connecting' || connectionState === 'reconnecting') && (
+          <ConnectionBanner state={connectionState} />
+        )}
         {/* Header */}
         <header className="flex items-center justify-between px-3 py-1.5 border border-[var(--border)] bg-[var(--bg-card)] mb-2 shrink-0">
           <div className="flex items-center gap-2">

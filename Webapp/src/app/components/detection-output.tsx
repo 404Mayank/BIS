@@ -14,22 +14,54 @@ interface DetectionOutputProps {
 export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, onCapture }: DetectionOutputProps) {
   const [captureResult, setCaptureResult] = useState<CaptureResult | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [frozenFrame, setFrozenFrame] = useState<string | null>(null);
+
+  // Clear capture overlay when camera goes off/on
+  useEffect(() => {
+    if (!isCameraOn) {
+      setCaptureResult(null);
+      setFrozenFrame(null);
+      setIsCapturing(false);
+    }
+  }, [isCameraOn]);
 
   const handleCapture = async () => {
-    if (!onCapture) return;
+    if (!onCapture || !videoRef.current) return;
+
+    // Freeze the current frame immediately so user sees a snapshot while GPU works
+    try {
+      const video = videoRef.current;
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = video.videoWidth;
+      tempCanvas.height = video.videoHeight;
+      const ctx = tempCanvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
+        setFrozenFrame(tempCanvas.toDataURL('image/jpeg', 0.9));
+      }
+    } catch { /* ignore freeze errors */ }
+
     setIsCapturing(true);
     setCaptureResult(null);
     try {
       const result = await onCapture();
       if (result) {
         setCaptureResult(result);
+        setFrozenFrame(null); // replace frozen frame with annotated result
+      } else {
+        setFrozenFrame(null); // unfreeze on failure
       }
+    } catch {
+      setFrozenFrame(null);
     } finally {
       setIsCapturing(false);
     }
   };
 
-  const dismissCapture = () => setCaptureResult(null);
+  const dismissCapture = () => {
+    setCaptureResult(null);
+    setFrozenFrame(null);
+  };
 
   return (
     <div className="border border-neutral-700/50 dark:border-neutral-700/50 bg-[var(--bg-card)] overflow-hidden flex flex-col h-full">
@@ -41,7 +73,7 @@ export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, on
           {onCapture && (
             <button
               onClick={handleCapture}
-              disabled={isCapturing || isRunning || !isCameraOn}
+              disabled={isCapturing || !isCameraOn}
               className="flex items-center gap-1 px-2 py-1 text-[10px] bg-cyan-900/40 hover:bg-cyan-800/50 border border-cyan-700/40 text-cyan-300 tracking-wider uppercase transition-colors disabled:opacity-50"
             >
               {isCapturing ? (
@@ -68,13 +100,26 @@ export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, on
           playsInline
           muted
           className="absolute inset-0 w-full h-full object-contain"
-          style={{ opacity: captureResult ? 0 : 1 }}
+          style={{ opacity: captureResult || frozenFrame ? 0 : 1 }}
         />
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-contain"
-          style={{ pointerEvents: 'none', opacity: captureResult ? 0 : 1 }}
+          style={{ pointerEvents: 'none', opacity: captureResult || frozenFrame ? 0 : 1 }}
         />
+
+        {/* Frozen frame shown while GPU processes capture */}
+        {frozenFrame && !captureResult && (
+          <div className="absolute inset-0 z-5 bg-black flex items-center justify-center">
+            <img src={frozenFrame} alt="Captured frame" className="w-full h-full object-contain" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <div className="flex items-center gap-2 text-cyan-400 text-xs tracking-wider">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Processing on GPU…</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Capture Result Overlay */}
         {captureResult && (

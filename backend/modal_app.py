@@ -26,6 +26,7 @@ DB_PATH = f"{DATA_MOUNT}/bis.db"
 # ---------------------------------------------------------------------------
 gpu_image = (
     modal.Image.debian_slim(python_version="3.11")
+    .apt_install("libgl1-mesa-glx", "libglib2.0-0")
     .pip_install(
         "ultralytics",
         "opencv-python-headless",
@@ -220,7 +221,7 @@ def web_app():
             )
             conn.commit()
             user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-            vol.commit()  # persist DB changes
+            vol.commit()  # persist DB changes (sync OK in non-async helper)
             return dict(user)
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=409, detail="Username already exists")
@@ -492,8 +493,8 @@ def web_app():
 
     # ---- Model endpoints ----
 
-    def get_available_models():
-        vol.reload()  # see latest uploads
+    async def get_available_models():
+        await vol.reload.aio()  # see latest uploads
         models = []
         for file in models_path.glob("*.pt"):
             size_bytes = file.stat().st_size
@@ -509,7 +510,7 @@ def web_app():
 
     @fastapi_app.get("/api/models")
     async def list_models_endpoint(user: dict = Depends(get_current_user)):
-        return get_available_models()
+        return await get_available_models()
 
     @fastapi_app.post("/api/models/upload")
     async def upload_model(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
@@ -520,7 +521,7 @@ def web_app():
             content = await file.read()
             with open(file_path, "wb") as f:
                 f.write(content)
-            vol.commit()  # persist to Volume
+            await vol.commit.aio()  # persist to Volume
 
             # Track non-admin uploads as temporary
             if user.get("role") != "admin":
@@ -546,7 +547,7 @@ def web_app():
         if new_path.exists() and new_path != old_path:
             raise HTTPException(status_code=409, detail="A model with that name already exists")
         old_path.rename(new_path)
-        vol.commit()
+        await vol.commit.aio()
         return {"message": "Model renamed", "old_id": model_id, "new_id": safe_name}
 
     @fastapi_app.delete("/api/models/{model_id}")
@@ -555,7 +556,7 @@ def web_app():
         if not model_path.exists():
             raise HTTPException(status_code=404, detail="Model not found")
         model_path.unlink()
-        vol.commit()
+        await vol.commit.aio()
         return {"message": "Model deleted", "id": model_id}
 
     # ---- Health check ----
@@ -601,7 +602,8 @@ def web_app():
 
                 if action == "load_model":
                     model_id = data.get("model")
-                    model_info = next((m for m in get_available_models() if m["id"] == model_id), None)
+                    models = await get_available_models()
+                    model_info = next((m for m in models if m["id"] == model_id), None)
                     if not model_info:
                         await websocket.send_json({"error": "Model not found"})
                         continue
@@ -622,7 +624,7 @@ def web_app():
 
                     try:
                         # Dispatch to GPU function
-                        result = run_inference.remote(model_id, frame_bytes, conf, action)
+                        result = await run_inference.remote.aio(model_id, frame_bytes, conf, action)
                         await websocket.send_json(result)
                     except Exception as e:
                         print(f"Inference error: {e}")
@@ -650,6 +652,6 @@ def web_app():
                         print(f"Cleaned up temp model: {mid} (user: {user['username']})")
                     del temp_models[mid]
                 if to_remove:
-                    vol.commit()
+                    await vol.commit.aio()
 
     return fastapi_app
