@@ -183,6 +183,7 @@ export default function App() {
                 videoRef={camera.videoRef}
                 isRunning={isRunning}
                 isCameraOn={camera.isOn}
+                isWaitingForGpu={isRunning && fps === 0}
                 onCapture={isModelLoaded && camera.isOn ? handleCapture : undefined}
               />
             ) : (

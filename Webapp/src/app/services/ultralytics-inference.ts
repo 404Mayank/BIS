@@ -70,15 +70,24 @@ export class UltralyticsInferenceService implements InferenceService {
 
   async loadModel(modelId: string): Promise<void> {
     this.currentModel = modelId;
-    this.shouldReconnect = true;
 
-    // Close existing connection
-    if (this.ws) {
-      this.shouldReconnect = false;
-      this.ws.close();
-      this.shouldReconnect = true;
+    // Kill any pending reconnect timer
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
 
+    // Detach handlers from old WS BEFORE closing to prevent stale onclose triggering reconnect
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onclose = null;
+      try { this.ws.close(); } catch { /* ignore */ }
+      this.ws = null;
+    }
+
+    this.shouldReconnect = true;
     return this._connect(modelId);
   }
 
@@ -94,11 +103,27 @@ export class UltralyticsInferenceService implements InferenceService {
   private _connect(modelId: string): Promise<void> {
     return new Promise((resolve, reject) => {
       this._setConnectionState('connecting');
+
+      // Safety timeout — don't let the loading overlay hang forever
+      const connectTimeout = setTimeout(() => {
+        if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+          this.ws.onopen = null;
+          this.ws.onmessage = null;
+          this.ws.onerror = null;
+          this.ws.onclose = null;
+          try { this.ws.close(); } catch { /* */ }
+          this.ws = null;
+          this._setConnectionState('error');
+          reject(new Error('Connection timed out'));
+        }
+      }, 90_000); // 90s max wait
+
       try {
         const token = getToken();
         const url = `${this.baseUrl}/ws/detect${token ? `?token=${token}` : ''}`;
         this.ws = new WebSocket(url);
       } catch (e) {
+        clearTimeout(connectTimeout);
         this._scheduleReconnect(modelId, resolve);
         return;
       }
@@ -107,6 +132,7 @@ export class UltralyticsInferenceService implements InferenceService {
 
       this.ws.onopen = () => {
         opened = true;
+        clearTimeout(connectTimeout);
         this.reconnectDelay = 1000;
         this._setConnectionState('connected');
         this.ws?.send(JSON.stringify({ action: 'load_model', model: modelId }));

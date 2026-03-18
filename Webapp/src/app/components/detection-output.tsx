@@ -8,10 +8,11 @@ interface DetectionOutputProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   isRunning: boolean;
   isCameraOn: boolean;
+  isWaitingForGpu?: boolean;
   onCapture?: () => Promise<CaptureResult | null>;
 }
 
-export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, onCapture }: DetectionOutputProps) {
+export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, isWaitingForGpu, onCapture }: DetectionOutputProps) {
   const [captureResult, setCaptureResult] = useState<CaptureResult | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [frozenFrame, setFrozenFrame] = useState<string | null>(null);
@@ -117,6 +118,16 @@ export function DetectionOutput({ canvasRef, videoRef, isRunning, isCameraOn, on
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Processing on GPU…</span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* GPU initialization overlay — first frame delay */}
+        {isWaitingForGpu && !captureResult && !frozenFrame && (
+          <div className="absolute inset-0 z-5 flex items-center justify-center bg-black/50 pointer-events-none">
+            <div className="flex items-center gap-2 px-4 py-2 bg-neutral-900/90 border border-neutral-700/50">
+              <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
+              <span className="text-cyan-300 text-xs tracking-wider">Initializing GPU…</span>
             </div>
           </div>
         )}
