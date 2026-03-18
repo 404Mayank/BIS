@@ -2,7 +2,8 @@
  * Auth service — JWT token management and API helpers.
  */
 
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 const TOKEN_KEY = 'bis_token';
 const USER_KEY = 'bis_user';
 const EXPIRES_KEY = 'bis_expires';
@@ -176,5 +177,5 @@ export async function guestLogin(): Promise<AuthResponse> {
 
 export function getWsUrl(path: string): string {
   const token = getToken();
-  return `ws://localhost:8000${path}?token=${token}`;
+  return `${WS_URL}${path}?token=${token}`;
 }

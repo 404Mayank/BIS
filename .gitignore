@@ -42,3 +42,12 @@ yolo8s/
 .vscode/
 .idea/
 *.swp
+
+# Environment files (contain secrets/URLs)
+.env
+.env.local
+.env.production
+!Webapp/.env
+
+# Modal
+.modal.toml

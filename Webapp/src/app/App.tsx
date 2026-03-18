@@ -17,7 +17,7 @@ import type { ModelInfo, CaptureResult } from './services/inference-service';
 export default function App() {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const inferenceService = useMemo(() => new UltralyticsInferenceService('ws://localhost:8000'), []);
+  const inferenceService = useMemo(() => new UltralyticsInferenceService(), []);
 
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');

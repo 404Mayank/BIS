@@ -6,11 +6,14 @@
 import type { InferenceService, InferenceResult, CaptureResult, Detection } from './inference-service';
 import { getToken } from './auth-service';
 
+// Max dimension to resize frames to before sending (matches model imgsz)
+const FRAME_MAX_DIM = 768;
+
 export class UltralyticsInferenceService implements InferenceService {
   private ws: WebSocket | null = null;
   private baseUrl: string;
   private currentModel: string = '';
-  private canvas: HTMLCanvasElement;
+  private resizeCanvas: HTMLCanvasElement;
   private lastResult: InferenceResult = { detections: [], inferenceTimeMs: 0 };
   private pendingInference: boolean = false;
   private inferenceResolve: ((result: InferenceResult) => void) | null = null;
@@ -30,9 +33,33 @@ export class UltralyticsInferenceService implements InferenceService {
   // Capture mode
   private captureResolve: ((result: CaptureResult) => void) | null = null;
 
-  constructor(baseUrl: string = 'ws://localhost:8000') {
-    this.baseUrl = baseUrl;
-    this.canvas = document.createElement('canvas');
+  constructor(baseUrl?: string) {
+    this.baseUrl = baseUrl || import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+    this.resizeCanvas = document.createElement('canvas');
+  }
+
+  /**
+   * Resize a video/image element to fit within FRAME_MAX_DIM and return
+   * a JPEG data URL. This dramatically reduces bandwidth to the server.
+   */
+  private getResizedFrame(
+    el: HTMLVideoElement | HTMLImageElement,
+    quality: number,
+  ): string {
+    const srcW = el instanceof HTMLVideoElement ? el.videoWidth : el.width;
+    const srcH = el instanceof HTMLVideoElement ? el.videoHeight : el.height;
+
+    // Calculate scale to fit within FRAME_MAX_DIM
+    const scale = Math.min(1, FRAME_MAX_DIM / Math.max(srcW, srcH));
+    const dstW = Math.round(srcW * scale);
+    const dstH = Math.round(srcH * scale);
+
+    this.resizeCanvas.width = dstW;
+    this.resizeCanvas.height = dstH;
+    const ctx = this.resizeCanvas.getContext('2d');
+    if (!ctx) return '';
+    ctx.drawImage(el, 0, 0, dstW, dstH);
+    return this.resizeCanvas.toDataURL('image/jpeg', quality);
   }
 
   async loadModel(modelId: string): Promise<void> {
@@ -163,19 +190,15 @@ export class UltralyticsInferenceService implements InferenceService {
       return { detections: [], inferenceTimeMs: 0 };
     }
 
-    // Skip if still waiting for previous response
+    // Skip if still waiting for previous response (frame skipping)
     if (this.pendingInference) {
       return this.lastResult;
     }
 
-    const ctx = this.canvas.getContext('2d');
-    if (!ctx) return this.lastResult;
+    // Resize to 768px max & JPEG compress at quality 0.7 for bandwidth
+    const frameData = this.getResizedFrame(videoElement, 0.7);
+    if (!frameData) return this.lastResult;
 
-    this.canvas.width = videoElement instanceof HTMLVideoElement ? videoElement.videoWidth : videoElement.width;
-    this.canvas.height = videoElement instanceof HTMLVideoElement ? videoElement.videoHeight : videoElement.height;
-    ctx.drawImage(videoElement, 0, 0, this.canvas.width, this.canvas.height);
-
-    const frameData = this.canvas.toDataURL('image/jpeg', 0.8);
     this.pendingInference = true;
     this.ws.send(JSON.stringify({
       action: 'detect',
@@ -200,14 +223,9 @@ export class UltralyticsInferenceService implements InferenceService {
       return { detections: [], inferenceTimeMs: 0, summary: {}, total: 0 };
     }
 
-    const ctx = this.canvas.getContext('2d');
-    if (!ctx) return { detections: [], inferenceTimeMs: 0, summary: {}, total: 0 };
-
-    this.canvas.width = videoElement instanceof HTMLVideoElement ? videoElement.videoWidth : videoElement.width;
-    this.canvas.height = videoElement instanceof HTMLVideoElement ? videoElement.videoHeight : videoElement.height;
-    ctx.drawImage(videoElement, 0, 0, this.canvas.width, this.canvas.height);
-
-    const frameData = this.canvas.toDataURL('image/jpeg', 0.95); // Higher quality for capture
+    // Higher quality JPEG (0.9) for captures, still resized to 768px
+    const frameData = this.getResizedFrame(videoElement, 0.9);
+    if (!frameData) return { detections: [], inferenceTimeMs: 0, summary: {}, total: 0 };
 
     return new Promise((resolve) => {
       this.captureResolve = (result) => resolve({ ...result, frameData });
@@ -218,13 +236,13 @@ export class UltralyticsInferenceService implements InferenceService {
         model: this.currentModel,
       }));
 
-      // Timeout after 10s
+      // Timeout after 30s (GPU cold start can be slow)
       setTimeout(() => {
         if (this.captureResolve) {
           this.captureResolve({ detections: [], inferenceTimeMs: 0, summary: {}, total: 0 });
           this.captureResolve = null;
         }
-      }, 10000);
+      }, 30000);
     });
   }
 
