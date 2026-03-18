@@ -121,8 +121,8 @@ export default function App() {
         />
       )}
 
-      {/* Full viewport HUD — no scrolling on desktop */}
-      <div className="h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-mono flex flex-col overflow-hidden p-2 sm:p-3">
+      {/* Mobile: scrollable | Desktop: fixed viewport HUD */}
+      <div className="min-h-screen lg:h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-mono flex flex-col lg:overflow-hidden p-2 sm:p-3">
         {/* Connection banner for reconnections (not during initial model load) */}
         {!isModelLoading && (connectionState === 'connecting' || connectionState === 'reconnecting') && (
           <ConnectionBanner state={connectionState} />
@@ -173,10 +173,10 @@ export default function App() {
           />
         </div>
 
-        {/* Main: Camera (fills space) + Sidebar */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
-          {/* Main Content Area */}
-          <div className="min-h-0 overflow-hidden">
+        {/* Main: Camera + Sidebar */}
+        <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-[1fr_280px] gap-2">
+          {/* Camera / Detection Area — fixed height on mobile, fills space on desktop */}
+          <div className="h-[56vh] lg:h-auto lg:min-h-0 overflow-hidden order-2 lg:order-1">
             {inputMode === 'live' ? (
               <DetectionOutput
                 canvasRef={canvasRef}
@@ -195,8 +195,8 @@ export default function App() {
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="flex flex-col gap-2 min-h-0 overflow-y-auto">
+          {/* Sidebar — on mobile it's above the camera for easy access */}
+          <div className="flex flex-col gap-2 min-h-0 lg:overflow-y-auto order-1 lg:order-2">
             <YoloControls
               models={models}
               selectedModel={selectedModel}
