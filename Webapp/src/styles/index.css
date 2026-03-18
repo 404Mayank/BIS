@@ -1,0 +1,60 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Theme Variables */
+:root {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #171717;
+  --bg-card: rgba(23, 23, 23, 0.8);
+  --bg-card-header: rgba(38, 38, 38, 0.4);
+  --border: rgba(64, 64, 64, 0.5);
+  --text-primary: #e5e5e5;
+  --text-secondary: #a3a3a3;
+  --text-muted: #737373;
+  --accent: #22d3ee;
+  --accent-muted: rgba(34, 211, 238, 0.7);
+}
+
+.theme-light {
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-card-header: rgba(245, 245, 245, 0.9);
+  --border: rgba(212, 212, 212, 0.8);
+  --text-primary: #171717;
+  --text-secondary: #525252;
+  --text-muted: #a3a3a3;
+  --accent: #0891b2;
+  --accent-muted: rgba(8, 145, 178, 0.7);
+}
+
+html, body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Mobile-first touch targets */
+@media (max-width: 768px) {
+  button, select, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  input[type="range"] {
+    height: 8px;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
