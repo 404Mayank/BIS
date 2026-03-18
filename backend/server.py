@@ -12,7 +12,8 @@ from pydantic import BaseModel
 from auth import (
     create_user, authenticate_user, create_token, create_guest_token, decode_token,
     get_current_user, require_admin, get_user_by_id,
-    list_users, set_user_approved, set_session_minutes, delete_user
+    list_users, set_user_approved, set_session_minutes, delete_user,
+    GUEST_SESSION_MINUTES
 )
 
 app = FastAPI(title="BIS YOLO Backend")
@@ -45,9 +46,6 @@ class LoginRequest(BaseModel):
 class RenameRequest(BaseModel):
     name: str
 
-class SessionRequest(BaseModel):
-    minutes: int
-
 
 # --- Auth endpoints ---
 
@@ -68,7 +66,7 @@ async def register(req: LoginRequest):
             "username": user["username"],
             "role": user["role"],
             "approved": bool(user["approved"]),
-            "session_minutes": user.get("session_minutes", 5),
+            "session_minutes": user.get("session_minutes", 1440),
         }
     }
 
@@ -91,7 +89,23 @@ async def login(req: LoginRequest):
             "username": user["username"],
             "role": user["role"],
             "approved": bool(user["approved"]),
-            "session_minutes": user.get("session_minutes", 5),
+            "session_minutes": user.get("session_minutes", 1440),
+        }
+    }
+
+
+@app.post("/api/auth/guest")
+async def guest_login():
+    """Create a short-lived guest token for preview access."""
+    token = create_guest_token()
+    return {
+        "token": token,
+        "user": {
+            "id": 0,
+            "username": "guest",
+            "role": "guest",
+            "approved": True,
+            "session_minutes": GUEST_SESSION_MINUTES,
         }
     }
 
@@ -104,23 +118,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         "username": user["username"],
         "role": user["role"],
         "approved": bool(user["approved"]),
-        "session_minutes": user.get("session_minutes", 5),
-    }
-
-
-@app.post("/api/auth/guest")
-async def guest_login():
-    """Create a 5-minute guest session for preview."""
-    token = create_guest_token()
-    return {
-        "token": token,
-        "user": {
-            "id": 0,
-            "username": "guest",
-            "role": "guest",
-            "approved": True,
-            "session_minutes": 5,
-        }
+        "session_minutes": user.get("session_minutes", 1440),
     }
 
 
@@ -151,15 +149,19 @@ async def admin_delete_user(user_id: int, admin: dict = Depends(require_admin)):
     return {"message": "User deleted"}
 
 
+class SessionMinutesRequest(BaseModel):
+    minutes: int
+
+
 @app.patch("/api/admin/users/{user_id}/session")
-async def admin_set_session(user_id: int, req: SessionRequest, admin: dict = Depends(require_admin)):
-    """Set session length in minutes for a user."""
-    if req.minutes < 1 or req.minutes > 10080:  # max 1 week
-        raise HTTPException(status_code=400, detail="Session must be 1-10080 minutes")
-    user = set_session_minutes(user_id, req.minutes)
-    if not user:
+async def admin_set_session(
+    user_id: int, req: SessionMinutesRequest, admin: dict = Depends(require_admin)
+):
+    """Set session duration for a user (in minutes)."""
+    updated = set_session_minutes(user_id, req.minutes)
+    if not updated:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return updated
 
 
 # --- Model endpoints ---
@@ -436,6 +438,10 @@ async def websocket_detect(websocket: WebSocket, token: str = Query(None)):
         print(f"Client disconnected: {user['username']}")
     except Exception as e:
         print(f"WS Exception: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
         try:
             await websocket.close()
         except:

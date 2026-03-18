@@ -83,7 +83,7 @@ export function LoginPage() {
 
           <form onSubmit={handleSubmit} className="p-4 space-y-4">
             <div className="space-y-1.5">
-              <label className="text-neutral-400 text-[10px] tracking-wider uppercase">Username</label>
+              <label className="text-[var(--text-secondary)] text-[10px] tracking-wider uppercase">Username</label>
               <input
                 type="text"
                 value={username}
@@ -97,7 +97,7 @@ export function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-neutral-400 text-[10px] tracking-wider uppercase">Password</label>
+              <label className="text-[var(--text-secondary)] text-[10px] tracking-wider uppercase">Password</label>
               <input
                 type="password"
                 value={password}
@@ -118,7 +118,7 @@ export function LoginPage() {
                   onChange={e => setRememberMe(e.target.checked)}
                   className="w-3 h-3 accent-cyan-500"
                 />
-                <span className="text-neutral-400 text-[10px] tracking-wider uppercase">Remember me</span>
+                <span className="text-[var(--text-secondary)] text-[10px] tracking-wider uppercase">Remember me</span>
               </label>
             )}
 
@@ -137,7 +137,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-cyan-900/50 hover:bg-cyan-800/60 border border-cyan-600/40 text-cyan-300 text-xs tracking-wider uppercase transition-colors disabled:opacity-50"
+              className="w-full py-2.5 bg-cyan-900/50 hover:bg-cyan-800/60 border border-[var(--border)] text-[var(--text-primary)] border-cyan-600/40 text-cyan-300 text-xs tracking-wider uppercase transition-colors disabled:opacity-50"
             >
               {loading ? 'Please wait...' : (isRegister ? 'Create Account' : 'Sign In')}
             </button>
@@ -146,7 +146,7 @@ export function LoginPage() {
           <div className="px-4 py-3 border-t border-[var(--border)] flex items-center justify-between">
             <button
               onClick={() => { setIsRegister(!isRegister); setError(''); setSuccess(''); }}
-              className="text-neutral-500 hover:text-neutral-300 text-xs transition-colors"
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs transition-colors"
             >
               {isRegister ? 'Sign in instead' : 'Register'}
             </button>

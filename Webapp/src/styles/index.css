@@ -29,57 +29,8 @@
   --accent-muted: rgba(8, 145, 178, 0.7);
 }
 
-/* Light mode overrides for hardcoded Tailwind neutral colors */
-.theme-light .border-neutral-700\/50 {
-  border-color: rgba(212, 212, 212, 0.6) !important;
-}
-.theme-light .bg-neutral-800 {
-  background-color: #e5e5e5 !important;
-}
-.theme-light .bg-neutral-800\/30 {
-  background-color: rgba(229, 229, 229, 0.3) !important;
-}
-.theme-light .hover\:bg-neutral-700:hover {
-  background-color: #d4d4d4 !important;
-}
-.theme-light .hover\:bg-neutral-700\/30:hover {
-  background-color: rgba(212, 212, 212, 0.3) !important;
-}
-.theme-light .text-neutral-300 {
-  color: #525252 !important;
-}
-.theme-light .text-neutral-400 {
-  color: #737373 !important;
-}
-.theme-light .text-neutral-500 {
-  color: #a3a3a3 !important;
-}
-.theme-light .border-neutral-600 {
-  border-color: #d4d4d4 !important;
-}
-.theme-light .border-neutral-700 {
-  border-color: #e5e5e5 !important;
-}
-.theme-light select,
-.theme-light input[type="text"],
-.theme-light input[type="password"],
-.theme-light input[type="number"] {
-  background-color: var(--bg-secondary) !important;
-  border-color: var(--border) !important;
-  color: var(--text-primary) !important;
-}
-.theme-light .bg-cyan-900\/40,
-.theme-light .bg-cyan-900\/50 {
-  background-color: rgba(8, 145, 178, 0.15) !important;
-}
-.theme-light .bg-red-950\/50 {
-  background-color: rgba(220, 38, 38, 0.1) !important;
-}
-.theme-light .bg-emerald-950\/50 {
-  background-color: rgba(16, 185, 129, 0.1) !important;
-}
-
-html, body {
+html,
+body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -87,11 +38,14 @@ html, body {
 
 /* Mobile-first touch targets */
 @media (max-width: 768px) {
-  button, select, [role="button"] {
+
+  button,
+  select,
+  [role="button"] {
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   input[type="range"] {
     height: 8px;
   }
@@ -101,9 +55,11 @@ html, body {
 ::-webkit-scrollbar {
   width: 4px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 2px;

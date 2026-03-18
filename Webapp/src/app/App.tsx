@@ -6,6 +6,7 @@ import { DetectionOutput } from './components/detection-output';
 import { MetricsPanel } from './components/metrics-panel';
 import { DetectionsList } from './components/detections-list';
 import { LoadingOverlay } from './components/loading-overlay';
+import { SessionTimer } from './components/session-timer';
 import { useCamera } from './hooks/use-camera';
 import { useInference } from './hooks/use-inference';
 import { UltralyticsInferenceService } from './services/ultralytics-inference';
@@ -114,9 +115,14 @@ export default function App() {
               BIS <span className="text-[var(--text-muted)] text-[10px] tracking-widest">BLISTER INSPECTION</span>
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {user && (
-              <span className="text-neutral-500 text-[10px]">{user.username}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[var(--text-muted)] text-[10px] uppercase tracking-widest px-2 py-0.5 border border-[var(--border)] bg-[var(--bg-card-header)]">
+                  {user.username}
+                </span>
+                <SessionTimer />
+              </div>
             )}
             {userIsAdmin && (
               <button
@@ -129,7 +135,7 @@ export default function App() {
             )}
             <button
               onClick={handleLogout}
-              className="p-1 text-neutral-500 hover:text-red-400 transition-colors"
+              className="p-1 text-[var(--text-muted)] hover:text-red-400 transition-colors"
               title="Logout"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -148,7 +154,7 @@ export default function App() {
         </div>
 
         {/* Main: Camera (fills space) + Sidebar */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-2">
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
           {/* Camera — fills all available space */}
           <div className="min-h-0 overflow-hidden">
             <DetectionOutput

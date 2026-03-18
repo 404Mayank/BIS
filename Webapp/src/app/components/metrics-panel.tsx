@@ -10,21 +10,21 @@ export function MetricsPanel({ fps, inferenceTime, isRunning, detectionCount }: 
   const latencyStatus = !isRunning ? 'idle' : inferenceTime < 40 ? 'good' : inferenceTime < 80 ? 'warn' : 'bad';
 
   const statusColor = {
-    idle: 'text-neutral-600',
+    idle: 'text-[var(--text-muted)]',
     good: 'text-emerald-400',
     warn: 'text-amber-400',
     bad: 'text-red-400',
   };
 
   const dotColor = {
-    idle: 'bg-neutral-700',
+    idle: 'bg-[var(--border)]',
     good: 'bg-emerald-500',
     warn: 'bg-amber-500',
     bad: 'bg-red-500',
   };
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-neutral-700/30 border border-neutral-700/50">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[var(--border)] border border-[var(--border)]">
       <Metric
         label="FPS"
         value={isRunning ? String(fps) : '--'}
@@ -40,8 +40,8 @@ export function MetricsPanel({ fps, inferenceTime, isRunning, detectionCount }: 
       <Metric
         label="OBJECTS"
         value={isRunning ? String(detectionCount) : '--'}
-        dotClass={isRunning ? 'bg-blue-500' : 'bg-neutral-700'}
-        valueClass={isRunning ? 'text-blue-400' : 'text-neutral-600'}
+        dotClass={isRunning ? 'bg-blue-500' : 'bg-[var(--border)]'}
+        valueClass={isRunning ? 'text-blue-400' : 'text-[var(--text-muted)]'}
       />
       <Metric
         label="STATUS"

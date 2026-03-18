@@ -134,11 +134,11 @@ export function YoloControls({
       <div className="p-3 space-y-3">
         {/* Model Select */}
         <ControlGroup label="Model">
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             <select
               value={selectedModel}
               onChange={(e) => onModelChange(e.target.value)}
-              className="flex-1 bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] text-xs px-2.5 py-2 focus:outline-none focus:border-cyan-500/40 appearance-none cursor-pointer transition-colors"
+              className="w-full bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] text-xs px-2.5 py-2 focus:outline-none focus:border-[var(--accent)] appearance-none cursor-pointer transition-colors"
             >
               {models.length === 0 && <option value="">No models found</option>}
               {models.map(m => (
@@ -148,59 +148,63 @@ export function YoloControls({
               ))}
             </select>
 
-            {/* Model management buttons (admin only) */}
-            {userIsAdmin && selectedModel && (
-              <>
-                {renamingModel === selectedModel ? (
-                  <div className="flex gap-1">
+            <div className="flex items-center justify-between gap-2">
+              {/* Model management buttons (admin only) */}
+              {userIsAdmin && selectedModel ? (
+                renamingModel === selectedModel ? (
+                  <div className="flex items-center gap-1">
                     <input
                       type="text"
                       value={renameValue}
                       onChange={e => setRenameValue(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleRename(selectedModel)}
-                      className="w-20 bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] text-[10px] px-1.5 py-1 focus:outline-none focus:border-[var(--accent)]"
+                      className="w-24 bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] text-[10px] px-1.5 py-1 focus:outline-none focus:border-[var(--accent)]"
                       placeholder="New name"
                       autoFocus
                     />
-                    <button onClick={() => handleRename(selectedModel)} className="text-emerald-400 text-[10px] px-1">✓</button>
-                    <button onClick={() => setRenamingModel(null)} className="text-neutral-500 text-[10px] px-1">✕</button>
+                    <button onClick={() => handleRename(selectedModel)} className="text-emerald-400 text-[10px] px-1 hover:text-emerald-300">✓</button>
+                    <button onClick={() => setRenamingModel(null)} className="text-[var(--text-muted)] text-[10px] px-1 hover:text-[var(--text-primary)]">✕</button>
                   </div>
                 ) : (
-                  <>
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => { setRenamingModel(selectedModel); setRenameValue(''); }}
-                      className="p-1.5 text-neutral-500 hover:text-cyan-400 transition-colors"
+                      className="p-1.5 text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
                       title="Rename model"
                     >
-                      <Pencil className="w-3 h-3" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(selectedModel)}
-                      className="p-1.5 text-neutral-500 hover:text-red-400 transition-colors"
+                      className="p-1.5 text-[var(--text-muted)] hover:text-red-400 transition-colors"
                       title="Delete model"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                  </>
-                )}
-              </>
-            )}
+                  </div>
+                )
+              ) : (
+                <div /> /* Empty spacer */
+              )}
 
-            <input
-              type="file"
-              accept=".pt"
-              className="hidden"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="px-3 bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 text-xs text-neutral-300 disabled:opacity-50 transition-colors"
-              title="Import Model (.pt)"
-            >
-              {isUploading ? '...' : 'Import'}
-            </button>
+              <div className="flex shrink-0">
+                <input
+                  type="file"
+                  accept=".pt"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="px-3 py-1.5 bg-[var(--bg-card-header)] hover:bg-[var(--bg-card)] border border-[var(--border)] text-xs text-[var(--text-primary)] disabled:opacity-50 transition-colors"
+                  title="Import Model (.pt)"
+                >
+                  {isUploading ? 'Uploading...' : 'Import'}
+                </button>
+              </div>
+            </div>
           </div>
         </ControlGroup>
 

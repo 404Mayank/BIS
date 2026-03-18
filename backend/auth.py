@@ -9,14 +9,14 @@ import bcrypt
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from jose import jwt, JWTError
-from fastapi import HTTPException, Depends, Query
+from fastapi import HTTPException, Depends, Request, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # --- Config ---
 DB_PATH = (Path(__file__).parent / "bis.db").resolve()
 JWT_SECRET = os.environ.get("JWT_SECRET", "bis-dev-secret-change-in-production")
 JWT_ALGORITHM = "HS256"
-DEFAULT_SESSION_MINUTES = 5
+DEFAULT_SESSION_MINUTES = 60 * 24  # 24h for regular users
 GUEST_SESSION_MINUTES = 5
 
 # --- Security scheme ---
@@ -24,7 +24,7 @@ security = HTTPBearer(auto_error=False)
 
 
 def get_db() -> sqlite3.Connection:
-    """Get a database connection with row factory. Ensures tables exist."""
+    """Get a database connection with row factory. Ensures table exists."""
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -35,15 +35,16 @@ def get_db() -> sqlite3.Connection:
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'user',
             approved INTEGER NOT NULL DEFAULT 0,
-            session_minutes INTEGER NOT NULL DEFAULT 5,
+            session_minutes INTEGER NOT NULL DEFAULT 1440,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
     """)
-    # Add session_minutes column if upgrading from older schema
+    # Ensure session_minutes column exists (migration for existing DBs)
     try:
-        conn.execute("ALTER TABLE users ADD COLUMN session_minutes INTEGER NOT NULL DEFAULT 5")
+        conn.execute("SELECT session_minutes FROM users LIMIT 1")
     except sqlite3.OperationalError:
-        pass  # Column already exists
+        conn.execute("ALTER TABLE users ADD COLUMN session_minutes INTEGER NOT NULL DEFAULT 1440")
+        conn.commit()
     return conn
 
 
@@ -53,16 +54,15 @@ def create_user(username: str, password: str) -> dict:
     """Create a new user. First user auto-becomes approved admin."""
     conn = get_db()
     try:
+        # Check if this is the first user
         count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         role = "admin" if count == 0 else "user"
         approved = 1 if count == 0 else 0
-        # Admin gets 24h session, regular users get default
-        session_min = 1440 if count == 0 else DEFAULT_SESSION_MINUTES
 
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, approved, session_minutes) VALUES (?, ?, ?, ?, ?)",
-            (username, password_hash, role, approved, session_min)
+            "INSERT INTO users (username, password_hash, role, approved) VALUES (?, ?, ?, ?)",
+            (username, password_hash, role, approved)
         )
         conn.commit()
 
@@ -117,6 +117,9 @@ def set_user_approved(user_id: int, approved: bool) -> dict | None:
 
 
 def set_session_minutes(user_id: int, minutes: int) -> dict | None:
+    """Set the session duration for a user (admin action)."""
+    if minutes < 1 or minutes > 10080:  # 1 min to 7 days
+        raise HTTPException(status_code=400, detail="Session must be 1–10080 minutes")
     conn = get_db()
     conn.execute("UPDATE users SET session_minutes = ? WHERE id = ?", (minutes, user_id))
     conn.commit()
@@ -127,6 +130,7 @@ def set_session_minutes(user_id: int, minutes: int) -> dict | None:
 
 def delete_user(user_id: int) -> bool:
     conn = get_db()
+    # Prevent deleting the last admin
     user = conn.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
     if user and user["role"] == "admin":
         admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE role = 'admin'").fetchone()[0]
@@ -142,11 +146,10 @@ def delete_user(user_id: int) -> bool:
 
 # --- JWT operations ---
 
-def create_token(user: dict, expire_minutes: int | None = None) -> str:
-    """Create a JWT token with configurable expiry."""
-    if expire_minutes is None:
-        expire_minutes = user.get("session_minutes", DEFAULT_SESSION_MINUTES)
-    expire = datetime.now(timezone.utc) + timedelta(minutes=expire_minutes)
+def create_token(user: dict) -> str:
+    """Create a JWT token for the given user."""
+    minutes = user.get("session_minutes", DEFAULT_SESSION_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
     payload = {
         "sub": str(user["id"]),
         "username": user["username"],
@@ -158,7 +161,7 @@ def create_token(user: dict, expire_minutes: int | None = None) -> str:
 
 
 def create_guest_token() -> str:
-    """Create a short-lived guest token."""
+    """Create a short-lived guest token (no DB record needed)."""
     expire = datetime.now(timezone.utc) + timedelta(minutes=GUEST_SESSION_MINUTES)
     payload = {
         "sub": "guest",
@@ -190,7 +193,7 @@ async def get_current_user(
 
     payload = decode_token(credentials.credentials)
 
-    # Guest users don't have a DB record
+    # Guest users don't have DB records
     if payload.get("sub") == "guest":
         return {"id": 0, "username": "guest", "role": "guest", "approved": 1, "session_minutes": GUEST_SESSION_MINUTES}
 
@@ -209,4 +212,21 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     """Dependency: require admin role."""
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+def get_token_from_query(token: str = Query(None)) -> dict:
+    """Extract user from query param token (for WebSocket)."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+    payload = decode_token(token)
+
+    # Guest users don't have DB records
+    if payload.get("sub") == "guest":
+        return {"id": 0, "username": "guest", "role": "guest", "approved": 1, "session_minutes": GUEST_SESSION_MINUTES}
+
+    user_id = int(payload["sub"])
+    user = get_user_by_id(user_id)
+    if not user or not user["approved"]:
+        raise HTTPException(status_code=403, detail="Access denied")
     return user
