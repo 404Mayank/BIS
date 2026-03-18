@@ -108,6 +108,14 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
   const validCount = slots.filter(s => s.modelId).length;
   const hasResults = slots.some(s => s.result);
 
+  const allDetectedClasses = Array.from(
+    new Set(
+      slots
+        .filter(s => s.result)
+        .flatMap(s => Object.keys(s.result!.summary))
+    )
+  ).sort();
+
   // Grid layout: 2 cols for 2-3 models, 3 cols for 4+, always responsive
   const cols = slots.length <= 3 ? 'lg:grid-cols-2' : 'lg:grid-cols-3 xl:grid-cols-4';
 
@@ -201,7 +209,7 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
       </div>
 
       {/* Results area — fills remaining space */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-2">
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
         {!hasResults && !isComparing ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center space-y-3">
@@ -219,16 +227,63 @@ export function ModelCompare({ models, onClose, videoRef, isCameraOn }: ModelCom
             </div>
           </div>
         ) : (
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${cols} gap-2 h-full auto-rows-fr`}>
-            {slots.filter(s => s.result || s.isLoading).map(slot => (
-              <ComparePanel
-                key={slot.id}
-                label={models.find(m => m.id === slot.modelId)?.name || slot.modelId}
-                result={slot.result}
-                isLoading={slot.isLoading}
-              />
-            ))}
-          </div>
+          <>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${cols} gap-2 min-h-[300px] flex-1`}>
+              {slots.filter(s => s.result || s.isLoading).map(slot => (
+                <ComparePanel
+                  key={slot.id}
+                  label={models.find(m => m.id === slot.modelId)?.name || slot.modelId}
+                  result={slot.result}
+                  isLoading={slot.isLoading}
+                />
+              ))}
+            </div>
+
+            {hasResults && allDetectedClasses.length > 0 && (
+              <div className="shrink-0 bg-neutral-900/80 border border-neutral-700/50">
+                <div className="px-3 py-2 border-b border-neutral-700/50 bg-neutral-800/40">
+                  <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Detection Summary</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-neutral-300 whitespace-nowrap">
+                    <thead className="bg-neutral-800/20 text-neutral-500 uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th className="px-3 py-2 font-medium border-b border-neutral-700/50">Class</th>
+                        {slots.filter(s => s.result || s.isLoading).map(slot => (
+                          <th key={slot.id} className="px-3 py-2 font-medium border-b border-neutral-700/50">
+                            {models.find(m => m.id === slot.modelId)?.name || slot.modelId}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-800/50">
+                      {allDetectedClasses.map(cls => (
+                        <tr key={cls} className="hover:bg-neutral-800/30">
+                          <td className="px-3 py-1.5 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: getDetectionColor(cls) }} />
+                            {cls}
+                          </td>
+                          {slots.filter(s => s.result || s.isLoading).map(slot => (
+                            <td key={slot.id} className="px-3 py-1.5 font-mono tabular-nums">
+                              {slot.result ? (slot.result.summary[cls] || 0) : '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                      <tr className="bg-neutral-800/30 font-bold">
+                        <td className="px-3 py-2 text-[10px] tracking-widest text-neutral-400">TOTAL</td>
+                        {slots.filter(s => s.result || s.isLoading).map(slot => (
+                          <td key={slot.id} className="px-3 py-2 font-mono tabular-nums text-cyan-400">
+                            {slot.result ? slot.result.total : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
