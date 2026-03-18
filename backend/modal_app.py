@@ -55,7 +55,7 @@ cpu_image = (
     image=gpu_image,
     volumes={DATA_MOUNT: vol},
     timeout=120,
-    scaledown_window=120,  # stay warm 2 min after last call
+    scaledown_window=30,  # aggressive: GPU spins down 30s after last call
 )
 def run_inference(model_id: str, frame_bytes: bytes, conf: float, action: str) -> dict:
     """Run YOLO inference on a single frame. Called from the CPU web server."""
@@ -154,7 +154,7 @@ def run_inference(model_id: str, frame_bytes: bytes, conf: float, action: str) -
     cpu=1.0,
     memory=1024,
     volumes={DATA_MOUNT: vol},
-    scaledown_window=300,  # 5 min keep-warm
+    scaledown_window=60,  # aggressive: CPU spins down 60s after last request
     secrets=[modal.Secret.from_name("bis-secrets")],
 )
 @modal.concurrent(max_inputs=100)

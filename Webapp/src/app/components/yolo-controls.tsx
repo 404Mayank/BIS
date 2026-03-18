@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, CameraOff, Play, Square, Sun, Moon, ArrowLeftRight, Pencil, Trash2, Image as ImageIcon, Video } from 'lucide-react';
+import { Camera, CameraOff, Play, Square, Sun, Moon, ArrowLeftRight, Pencil, Trash2, Image as ImageIcon, Video, DollarSign, ChevronDown } from 'lucide-react';
 import type { ModelInfo } from '../services/inference-service';
 import type { CameraDevice } from '../hooks/use-camera';
 import { authFetch, isAdmin as checkIsAdmin } from '../services/auth-service';
@@ -341,6 +341,9 @@ export function YoloControls({
             Compare Models
           </button>
         )}
+
+        {/* Cost-saving tips */}
+        <CostTips isRunning={isRunning} />
       </div>
     </div>
   );
@@ -353,6 +356,62 @@ function ControlGroup({ label, children }: { label: string; children: React.Reac
         {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+function CostTips({ isRunning }: { isRunning: boolean }) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <div className="border border-amber-900/30 bg-amber-950/20">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-[10px] tracking-wider uppercase text-amber-500/80 hover:text-amber-400 transition-colors"
+      >
+        <DollarSign className="w-3 h-3" />
+        <span>Usage Tips</span>
+        {isRunning && (
+          <span className="ml-1 px-1.5 py-0.5 bg-red-900/40 border border-red-800/40 text-red-400 text-[9px] animate-pulse">
+            GPU BILLING
+          </span>
+        )}
+        <ChevronDown className={`w-3 h-3 ml-auto transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3 space-y-2">
+          {isRunning && (
+            <div className="flex items-start gap-2 p-2 bg-red-950/30 border border-red-900/30">
+              <span className="text-red-400 text-[10px] leading-relaxed">
+                ⚡ GPU is active — stop detection when not inspecting to save costs.
+              </span>
+            </div>
+          )}
+          <ul className="space-y-1.5 text-[10px] text-neutral-500 leading-relaxed">
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 mt-0.5">▸</span>
+              <span><strong className="text-neutral-400">Use Capture</strong> instead of live detect for single inspections — 1 GPU call vs continuous</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 mt-0.5">▸</span>
+              <span><strong className="text-neutral-400">Stop detection</strong> immediately after inspecting — GPU shuts down after 30s of idle</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 mt-0.5">▸</span>
+              <span><strong className="text-neutral-400">Upload Image</strong> mode uses only 1 GPU call per image — cheapest option</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 mt-0.5">▸</span>
+              <span><strong className="text-neutral-400">Higher confidence</strong> = fewer false positives = less review time = less GPU time</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 mt-0.5">▸</span>
+              <span><strong className="text-neutral-400">$0 when idle</strong> — server scales to zero automatically when nobody is using it</span>
+            </li>
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
