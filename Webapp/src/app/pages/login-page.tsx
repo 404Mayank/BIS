@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Eye } from 'lucide-react';
-import { login, register, isLoggedIn, getUser } from '../services/auth-service';
+import { login, register, isLoggedIn, getUser, guestLogin } from '../services/auth-service';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +36,7 @@ export function LoginPage() {
           setSuccess('Account created! Waiting for admin approval.');
         }
       } else {
-        await login(username, password);
+        await login(username, password, rememberMe);
         navigate('/');
       }
     } catch (err: any) {
@@ -49,11 +50,7 @@ export function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/auth/guest', { method: 'POST' });
-      if (!res.ok) throw new Error('Guest access unavailable');
-      const data = await res.json();
-      localStorage.setItem('bis_token', data.token);
-      localStorage.setItem('bis_user', JSON.stringify(data.user));
+      await guestLogin();
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Guest access failed');
@@ -112,6 +109,19 @@ export function LoginPage() {
               />
             </div>
 
+            {/* Remember me (login only) */}
+            {!isRegister && (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  className="w-3 h-3 accent-cyan-500"
+                />
+                <span className="text-neutral-400 text-[10px] tracking-wider uppercase">Remember me</span>
+              </label>
+            )}
+
             {error && (
               <div className="px-3 py-2 bg-red-950/50 border border-red-800/50 text-red-400 text-xs">
                 {error}
@@ -138,7 +148,7 @@ export function LoginPage() {
               onClick={() => { setIsRegister(!isRegister); setError(''); setSuccess(''); }}
               className="text-neutral-500 hover:text-neutral-300 text-xs transition-colors"
             >
-              {isRegister ? 'Sign in' : 'Register'}
+              {isRegister ? 'Sign in instead' : 'Register'}
             </button>
             <button
               onClick={handleGuestPreview}
